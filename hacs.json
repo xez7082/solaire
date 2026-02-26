@@ -1,0 +1,7 @@
+{
+  "name": "Solaire",
+  "render_readme": true,
+  "type": "template",
+  "country": "FR",
+  "description": "Dashboard énergétique avec flux personnalisés et monitoring batterie."
+}
