@@ -51,7 +51,7 @@
       const c = this.config;
       return html`
         <ha-card style="width:${c.card_width||500}px; height:${c.card_height||400}px; position:relative; overflow:hidden; background:#000; border:2px solid ${c.border_color||'#333'}; border-radius:15px;">
-          <img src="${c.background_image}" style="position:absolute; width:100%; height:100%; object-fit:contain; z-index:1;">
+          <img src="${c.background_image}" style="position:absolute; width:100%; height:100%; object-fit:cover; z-index:1;">
           <canvas id="flowCanvas" width="${c.card_width||500}" height="${c.card_height||400}" style="position:absolute; z-index:5; pointer-events:none;"></canvas>
           <div style="position:absolute; width:100%; height:100%; z-index:10; pointer-events:none;">
             ${['s1','s2','s3','s4','s5','h1','h2','h3','h4','h5','b1','b2','b3','g1','g2'].map(p => this._renderItem(p))}
