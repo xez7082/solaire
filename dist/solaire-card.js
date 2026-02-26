@@ -19,22 +19,22 @@
 
     _draw() {
       const cv = this.renderRoot.querySelector('#flowCanvas');
-      if (!cv) return;
+      if (!cv || !this.config) return;
       const ctx = cv.getContext('2d');
       ctx.clearRect(0, 0, cv.width, cv.height);
       const c = this.config;
 
       if (c.show_grid) {
         ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.lineWidth = 0.5;
         for (let x=0; x<=cv.width; x+=50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,cv.height); ctx.stroke(); }
         for (let y=0; y<=cv.height; y+=50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(cv.width,y); ctx.stroke(); }
       }
 
-      for (let i = 1; i <= 15; i++) {
+      for (let i = 1; i <= 10; i++) {
         const pD = c['f'+i+'_p'];
-        if (!c['f'+i+'_en'] || !pD) continue;
-        const s = c['f'+i+'_s'], v = (s && this.hass.states[s]) ? parseFloat(this.hass.states[s].state) : 0;
-        if (v === 0 && s) continue;
+        if (!pD) continue;
+        const s = c['f'+i+'_s'], v = (s && this.hass.states[s]) ? parseFloat(this.hass.states[s].state) : 500;
         ctx.save();
         ctx.strokeStyle = c['f'+i+'_c'] || '#ff0';
         ctx.lineWidth = c['f'+i+'_w'] || 3;
@@ -44,12 +44,6 @@
         ctx.stroke(new Path2D(pD));
         ctx.restore();
       }
-    }
-
-    _fire(ent) {
-      if(!ent) return;
-      const e = new CustomEvent("hass-action", { detail: { config: { entity: ent }, action: "more-info" }, bubbles: true, composed: true });
-      this.dispatchEvent(e);
     }
 
     render() {
@@ -67,22 +61,20 @@
 
     _renderItem(p) {
       const c = this.config; if(!c[p+'_ent']) return '';
-      const s1 = this.hass.states[c[p+'_ent']];
-      const s2 = c[p+'_ent2'] ? this.hass.states[c[p+'_ent2']] : null;
+      const s1 = this.hass.states[c[p+'_ent']], s2 = c[p+'_ent2'] ? this.hass.states[c[p+'_ent2']] : null;
       if(!s1) return '';
-      
       return html`
-        <div class="item ${c[p+'_box']?'box':''}" style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; transform:rotate(${c[p+'_rot']||0}deg); cursor:pointer;" @click="${() => this._fire(c[p+'_ent'])}">
+        <div class="item ${c[p+'_box']?'box':''}" style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; transform:rotate(${c[p+'_rot']||0}deg);" @click="${() => { const e = new CustomEvent('hass-action', { detail: { config: { entity: c[p+'_ent'] }, action: 'more-info' }, bubbles: true, composed: true }); this.dispatchEvent(e); }}">
           ${c[p+'_img'] ? html`<img src="${c[p+'_img']}" style="width:${c[p+'_img_w']||40}px; transform:rotate(${c[p+'_img_rot']||0}deg);">` : ''}
-          <div style="color:${c[p+'_tc']||'#eee'}; font-size:0.7em; font-weight:bold;">${c[p+'_name']||''}</div>
-          <div style="color:${c[p+'_vc']||'#fff'}; font-weight:900; font-size:${c[p+'_fs']||1}em;">${parseFloat(s1.state).toFixed(0)}${c[p+'_u']||'W'}</div>
-          ${s2 ? html`<div style="color:#0f0; font-size:0.65em; font-weight:bold;">${s2.state} ${s2.attributes.unit_of_measurement||''}</div>` : ''}
+          <div style="color:${c[p+'_tc']||'#eee'}; font-size:${c[p+'_fs_t']||0.7}em; font-weight:bold;">${c[p+'_name']||''}</div>
+          <div style="color:${c[p+'_vc']||'#fff'}; font-weight:900; font-size:${c[p+'_fs_v']||1.1}em;">${parseFloat(s1.state).toFixed(c[p+'_dec']||0)} ${c[p+'_u']||'W'}</div>
+          ${s2 ? html`<div style="color:${c[p+'_v2c']||'#0f0'}; font-size:0.7em;">${s2.state} ${c[p+'_u2']||''}</div>` : ''}
         </div>`;
     }
 
     static get styles() { return css`
-      .item{position:absolute; display:flex; flex-direction:column; align-items:center; text-shadow: 1px 1px 2px #000; text-align:center;}
-      .box{background:rgba(0,0,0,0.6); padding:5px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(2px);}
+      .item{position:absolute; display:flex; flex-direction:column; align-items:center; text-shadow: 1px 1px 2px #000; text-align:center; cursor:pointer;}
+      .box{background:rgba(0,0,0,0.6); padding:8px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(4px);}
     `; }
   }
 
@@ -92,40 +84,60 @@
     _up(k, v) { this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: { ...this._config, [k]: v } }, bubbles: true, composed: true })); }
 
     render() {
-      const c = this._config;
       const tabs = [{id:'solar',n:'Solar'},{id:'house',n:'House'},{id:'bat',n:'Bat'},{id:'grid',n:'Grid'},{id:'flow',n:'Flow'},{id:'gen',n:'Gen'}];
-      return html`
-        <div style="background:#1c1c1c; color:white; padding:10px;">
-          <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;">
-            ${tabs.map(t => html`<button @click="${()=>this._tab=t.id}" style="flex:1; padding:8px; font-size:9px; background:${this._tab===t.id?'#4caf50':'#333'}; color:white; border:none; border-radius:4px;">${t.n.toUpperCase()}</button>`)}
-          </div>
-          ${this._renderTabContent()}
-        </div>`;
+      return html`<div style="background:#1c1c1c; color:white; padding:10px; font-family:sans-serif;">
+        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;">
+          ${tabs.map(t => html`<button @click="${()=>this._tab=t.id}" style="flex:1; padding:8px; font-size:9px; background:${this._tab===t.id?'#4caf50':'#333'}; color:white; border:none; border-radius:4px; cursor:pointer;">${t.n.toUpperCase()}</button>`)}
+        </div>
+        ${this._renderTabContent()}
+      </div>`;
     }
 
     _renderTabContent() {
       const c = this._config, t = this._tab;
       const pfx = {solar:['s1','s2','s3'], house:['h1','h2','h3'], bat:['b1','b2'], grid:['g1','g2']}[t];
-      if (pfx) {
-        return pfx.map(p => html`
-          <details style="background:#2b2b2b; margin-bottom:5px; padding:8px;">
-            <summary style="font-weight:bold; color:#4caf50;">${p.toUpperCase()} ${c[p+'_name']||''}</summary>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:5px;">
-              Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
-              Unité <input type="text" .value="${c[p+'_u']||'W'}" @input="${e=>this._up(p+'_u',e.target.value)}">
-              Entité 1 <input type="text" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
-              Entité 2 (Daily) <input type="text" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
-              X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}">
-              Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
-              <b>Inclinaison (°)</b> <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
-              Taille Texte <input type="number" step="0.1" .value="${c[p+'_fs']||1}" @input="${e=>this._up(p+'_fs',e.target.value)}">
-              Image URL <input type="text" style="grid-column:span 2" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
-            </div>
-          </details>
-        `);
-      }
-      if (t === 'gen') return html`Dimensions: <input type="number" .value="${c.card_width}"> x <input type="number" .value="${c.card_height}"><br>Grille <input type="checkbox" .checked="${c.show_grid}" @change="${e=>this._up('show_grid',e.target.checked)}">`;
-      if (t === 'flow') return html`${[1,2,3,4,5].map(i => html`Flux ${i}: <input type="text" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}"><br>Entité: <input type="text" .value="${c['f'+i+'_s']||''}" @input="${e=>this._up('f'+i+'_s',e.target.value)}"><br><br>`)}`;
+      if (pfx) return pfx.map(p => html`
+        <details style="background:#2b2b2b; margin-bottom:5px; padding:10px; border-radius:5px;">
+          <summary style="cursor:pointer; font-weight:bold; color:#4caf50;">CONFIG ${p.toUpperCase()} ${c[p+'_name']?' - '+c[p+'_name']:''}</summary>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
+            Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
+            Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}">
+            Entité 1 <input type="text" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
+            Unité 1 <input type="text" .value="${c[p+'_u']||'W'}" @input="${e=>this._up(p+'_u',e.target.value)}">
+            Entité 2 <input type="text" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
+            Unité 2 <input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}">
+            X Pos <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}">
+            Y Pos <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
+            Rot Bloc <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
+            Taille Val <input type="number" step="0.1" .value="${c[p+'_fs_v']||1.1}" @input="${e=>this._up(p+'_fs_v',e.target.value)}">
+            Image URL <input type="text" style="grid-column:span 2" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
+            Taille Img <input type="number" .value="${c[p+'_img_w']||40}" @input="${e=>this._up(p+'_img_w',e.target.value)}">
+            Rot Img <input type="number" .value="${c[p+'_img_rot']||0}" @input="${e=>this._up(p+'_img_rot',e.target.value)}">
+          </div>
+        </details>
+      `);
+      if (t === 'flow') return html`
+        <div style="background:#2b2b2b; padding:10px; border-radius:5px;">
+          Vitesse Générale <input type="range" min="1" max="10" .value="${c.flow_speed||3}" @change="${e=>this._up('flow_speed',e.target.value)}">
+          Point <input type="number" style="width:40px" .value="${c.dash_size||10}" @input="${e=>this._up('dash_size',e.target.value)}">
+          Espace <input type="number" style="width:40px" .value="${c.dash_gap||20}" @input="${e=>this._up('dash_gap',e.target.value)}">
+          <hr style="opacity:0.2; margin:10px 0;">
+          ${[1,2,3,4,5,6,7,8,9,10].map(i => html`
+            <details style="margin-bottom:5px;"><summary>Flux ${i}</summary>
+              Tracé SVG <input type="text" style="width:100%" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}">
+              Capteur Watts <input type="text" style="width:100%" .value="${c['f'+i+'_s']||''}" @input="${e=>this._up('f'+i+'_s',e.target.value)}">
+              Couleur <input type="color" .value="${c['f'+i+'_c']||'#ff0'}" @input="${e=>this._up('f'+i+'_c',e.target.value)}">
+              Épaisseur <input type="number" style="width:50px" .value="${c['f'+i+'_w']||3}" @input="${e=>this._up('f'+i+'_w',e.target.value)}">
+            </details>
+          `)}
+        </div>
+      `;
+      if (t === 'gen') return html`<div style="padding:10px; background:#2b2b2b;">
+        Fond URL <input type="text" style="width:100%" .value="${c.background_image}" @input="${e=>this._up('background_image',e.target.value)}"><br>
+        Largeur <input type="number" .value="${c.card_width||500}" @input="${e=>this._up('card_width',e.target.value)}">
+        Hauteur <input type="number" .value="${c.card_height||400}" @input="${e=>this._up('card_height',e.target.value)}"><br>
+        Grille <input type="checkbox" .checked="${c.show_grid}" @change="${e=>this._up('show_grid',e.target.checked)}">
+      </div>`;
     }
   }
   customElements.define("solaire-card-editor", SolaireCardEditor);
