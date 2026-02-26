@@ -28,17 +28,17 @@
     _renderTabContent(entities) {
       if (this._tab === 'flow') {
         return html`
-          <div class="section-title">FLUX D'ÉNERGIE (1-10)</div>
+          <div class="section-title">FLUX D'ÉNERGIE (SVG)</div>
           ${[1,2,3,4,5,6,7,8,9,10].map(i => html`
             <details class="group-box">
               <summary>Flux #${i} ${this._config['custom_flow_'+i+'_enabled'] ? '✔️' : '⚪'}</summary>
               <div class="group-content">
                 <div class="field">
-                    <label>Activer le flux</label>
+                    <label>Activer ce flux</label>
                     <input type="checkbox" .checked="${this._config['custom_flow_'+i+'_enabled']}" @change="${e => this._toggleFlow(i, e)}">
                 </div>
-                ${this._renderField("Sensor (Vitesse)", "custom_flow_"+i+"_sensor", "text")}
-                ${this._renderField("Tracé SVG (Path)", "custom_flow_"+i+"_path", "text")}
+                ${this._renderField("Sensor Vitesse (Facultatif)", "custom_flow_"+i+"_sensor", "text")}
+                ${this._renderField("Tracé SVG (ex: M 193 201 L 415 270)", "custom_flow_"+i+"_path", "text")}
                 ${this._renderField("Couleur", "custom_flow_"+i+"_color", "color")}
               </div>
             </details>
@@ -48,17 +48,17 @@
       const mapping = { solar: ['s1','s2','s3','s4','s5'], house: ['h1','h2','h3','h4','h5'], bat: ['b1','b2','b3'] };
       if (this._tab === 'gen') {
         return html`
-          <div class="section-title">CARTE</div>
-          <div class="row">${this._renderField("Largeur", "card_width", "number")}${this._renderField("Hauteur", "card_height", "number")}</div>
-          ${this._renderField("Image", "background_image", "text")}${this._renderField("Bordure", "border_color", "color")}
+          <div class="section-title">RÉGLAGES CARTE</div>
+          <div class="row">${this._renderField("Largeur (px)", "card_width", "number")}${this._renderField("Hauteur (px)", "card_height", "number")}</div>
+          ${this._renderField("Image de fond (/local/...)", "background_image", "text")}
+          ${this._renderField("Couleur Bordure", "border_color", "color")}
         `;
       }
-      return html`<div class="section-title">${this._tab}</div>${mapping[this._tab].map(p => this._renderGroup(p, entities, this._tab === 'bat'))}`;
+      return html`<div class="section-title">${this._tab.toUpperCase()}</div>${mapping[this._tab].map(p => this._renderGroup(p, entities, this._tab === 'bat'))}`;
     }
 
     _toggleFlow(i, ev) {
-        const newConfig = { ...this._config, ['custom_flow_'+i+'_enabled']: ev.target.checked };
-        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: newConfig }, bubbles: true, composed: true }));
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: { ...this._config, ['custom_flow_'+i+'_enabled']: ev.target.checked } }, bubbles: true, composed: true }));
     }
 
     _renderGroup(prefix, entities, isBattery) {
@@ -68,7 +68,7 @@
           <div class="group-content">
             ${this._renderField("Nom", prefix+"_name", "text")}
             ${this._renderEntityPicker("Sensor", prefix+"_entity", entities)}
-            <div class="row">${this._renderField("X", prefix+"_x", "number")}${this._renderField("Y", prefix+"_y", "number")}</div>
+            <div class="row">${this._renderField("Pos X", prefix+"_x", "number")}${this._renderField("Pos Y", prefix+"_y", "number")}</div>
             <div class="row">${this._renderField("Taille", prefix+"_size", "number")}${this._renderField("Rot", prefix+"_rot", "number")}</div>
             ${isBattery ? html`<div class="row">${this._renderField("W Jauge", prefix+"_w", "number")}${this._renderField("H Jauge", prefix+"_h", "number")}</div>`:''}
             ${this._renderField("Couleur", prefix+"_color", "color")}
@@ -84,15 +84,15 @@
     static get styles() { return css`
       .editor-container{background:#1a1a1a;color:white;padding:10px;font-family:sans-serif}
       .nav-tabs{display:flex;gap:3px;margin-bottom:10px}
-      button{background:#333;color:#eee;border:none;padding:6px;border-radius:4px;cursor:pointer;flex:1;font-size:0.7em}
+      button{background:#333;color:#eee;border:none;padding:8px 4px;border-radius:4px;cursor:pointer;flex:1;font-size:0.7em}
       button.active{background:#00ffff;color:black;font-weight:bold}
       .group-box{background:#252525;border:1px solid #444;margin-bottom:5px}
       summary{padding:8px;cursor:pointer;color:#00ffff;font-size:0.85em}
       .group-content{padding:10px;background:#111}
       .field{margin-bottom:8px;display:flex;flex-direction:column}
       label{font-size:0.7em;color:gray}
-      input{background:#222;border:1px solid #555;color:white;padding:5px;width:100%}
-      .section-title{color:#ff00ff;font-weight:bold;margin-bottom:8px}
+      input{background:#222;border:1px solid #555;color:white;padding:5px;width:100%;box-sizing:border-box}
+      .section-title{color:#ff00ff;font-weight:bold;margin-bottom:8px;text-transform:uppercase}
     `; }
   }
   customElements.define("solaire-card-editor", SolaireCardEditor);
@@ -103,23 +103,24 @@
     setConfig(config) { this.config = config; }
 
     _renderFlow(i) {
-        if (!this.config['custom_flow_'+i+'_enabled']) return html``;
-        const path = this.config['custom_flow_'+i+'_path'];
+        const conf = this.config;
+        if (!conf['custom_flow_'+i+'_enabled']) return html``;
+        const path = conf['custom_flow_'+i+'_path'];
         if (!path) return html``;
         
-        const color = this.config['custom_flow_'+i+'_color'] || '#00ffff';
-        const sensor = this.config['custom_flow_'+i+'_sensor'];
-        const val = this.hass.states[sensor] ? parseFloat(this.hass.states[sensor].state) : 100; // 100 par défaut pour tester
+        const color = conf['custom_flow_'+i+'_color'] || '#00ffff';
+        const sensor = conf['custom_flow_'+i+'_sensor'];
+        const val = (sensor && this.hass.states[sensor]) ? parseFloat(this.hass.states[sensor].state) : 500;
         
-        // Calcul de la vitesse : plus de Watts = plus rapide
-        const duration = val > 1 ? Math.max(0.5, 8 - (Math.abs(val) / 500)) : 0;
+        // Vitesse d'animation (plus c'est élevé, plus c'est lent)
+        const duration = val !== 0 ? Math.max(0.5, 12 - (Math.abs(val) / 200)) : 0;
 
         return html`
           <g>
-            <path d="${path}" fill="none" stroke="${color}" stroke-width="2" opacity="0.2" />
+            <path d="${path}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.15" />
             ${duration > 0 ? html`
-                <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="4,15" stroke-linecap="round">
-                    <animate attributeName="stroke-dashoffset" from="100" to="0" dur="${duration}s" repeatCount="indefinite" />
+                <path d="${path}" fill="none" stroke="${color}" stroke-width="4" stroke-dasharray="6,25" stroke-linecap="round">
+                    <animate attributeName="stroke-dashoffset" from="200" to="0" dur="${duration}s" repeatCount="indefinite" />
                 </path>
             ` : ''}
           </g>
@@ -134,11 +135,11 @@
       return html`
         <ha-card style="width:${w}px; height:${h}px; border:2px solid ${this.config.border_color||'#00ffff'}; background-image:url('${this.config.background_image}'); background-size:100% 100%; position:relative; overflow:hidden;">
           
-          <svg viewBox="0 0 ${w} ${h}" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1;">
+          <svg viewBox="0 0 ${w} ${h}" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;">
             ${[1,2,3,4,5,6,7,8,9,10].map(i => this._renderFlow(i))}
           </svg>
 
-          <div style="position:relative; z-index:2; width:100%; height:100%;">
+          <div style="position:relative; z-index:20; width:100%; height:100%;">
             ${['s1','s2','s3','s4','s5','h1','h2','h3','h4','h5'].map(p => this._renderData(p))}
             ${['b1','b2','b3'].map(p => this._renderBattery(p))}
           </div>
@@ -151,16 +152,16 @@
         const e = this.config[p+'_entity'];
         if(!e || !this.hass.states[e]) return html``;
         const soc = parseFloat(this.hass.states[e].state);
-        return html`<div class="sensor-block" style="left:${this.config[p+'_x']}px; top:${this.config[p+'_y']}px; transform:rotate(${this.config[p+'_rot']||0}deg)">
+        return html`<div class="sensor-block" style="left:${this.config[p+'_x']}px; top:${this.config[p+'_y']}px; transform:rotate(${this.config[p+'_rot']||0}deg); transform-origin: top left;">
             <div class="sensor-name">${this.config[p+'_name']}: ${soc}%</div>
-            <div class="bar" style="width:${this.config[p+'_w']||100}px; height:${this.config[p+'_h']||10}px; border:1px solid ${this.config[p+'_color']}"><div style="width:${soc}%; background:${soc>20?'#4caf50':'#f44336'}; height:100%"></div></div>
+            <div class="bar" style="width:${this.config[p+'_w']||100}px; height:${this.config[p+'_h']||10}px; border:1px solid ${this.config[p+'_color']||'white'}"><div style="width:${soc}%; background:${soc>20?'#4caf50':'#f44336'}; height:100%"></div></div>
         </div>`;
     }
 
     _renderData(p) {
         const e = this.config[p+'_entity'];
         if(!e || !this.hass.states[e]) return html``;
-        return html`<div class="sensor-block" style="left:${this.config[p+'_x']}px; top:${this.config[p+'_y']}px; color:${this.config[p+'_color']}; font-size:${this.config[p+'_size']||14}px; transform:rotate(${this.config[p+'_rot']||0}deg)">
+        return html`<div class="sensor-block" style="left:${this.config[p+'_x']}px; top:${this.config[p+'_y']}px; color:${this.config[p+'_color']}; font-size:${this.config[p+'_size']||14}px; transform:rotate(${this.config[p+'_rot']||0}deg); transform-origin: top left;">
             <div class="sensor-name">${this.config[p+'_name']}</div><div>${this.hass.states[e].state} <small>${this.hass.states[e].attributes.unit_of_measurement || ''}</small></div>
         </div>`;
     }
@@ -170,10 +171,9 @@
       .sensor-block{position:absolute;font-weight:bold;text-shadow:2px 2px 4px black;white-space:nowrap;line-height:1}
       .sensor-name{font-size:0.6em;opacity:0.8;text-transform:uppercase}
       .bar{background:rgba(0,0,0,0.5);border-radius:2px;overflow:hidden}
-      svg { display: block; }
     `; }
   }
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Master V7.1 Flux", preview: true });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Master V7.2", preview: true });
 })();
