@@ -14,7 +14,7 @@
         <div class="editor-container">
           <div class="nav-tabs">
             ${['solar','house','bat','flow','forecast','gen'].map(t => html`
-              <button class="${this._tab === t ? 'active' : ''}" @click="${() => this._tab = t}">${t}</button>
+              <button class="${this._tab === t ? 'active' : ''}" @click="${() => this._tab = t}">${t.toUpperCase()}</button>
             `)}
           </div>
           <div class="content">${this._renderTabContent(entities)}</div>
@@ -23,16 +23,19 @@
     }
     _renderTabContent(entities) {
       if (this._tab === 'flow') {
-        return html`<div class="section-title">FLUX (10 Max)</div>
+        return html`<div class="section-title">TRAJET DES FLUX (SVG)</div>
+          <p style="font-size:0.7em; color:#aaa; margin-bottom:10px;">Syntaxe : M startX startY L endX endY (Ex: M 50 50 L 200 200)</p>
           ${[1,2,3,4,5,6,7,8,9,10].map(i => html`
             <details class="group-box">
               <summary>${this._config['f'+i+'_en'] ? '🔵' : '⚪'} Flux #${i}</summary>
               <div class="group-content">
-                <label>Activer</label><input type="checkbox" .checked="${this._config['f'+i+'_en']}" @change="${e => this._up('f'+i+'_en', e.target.checked)}">
-                <div class="field"><label>Tracé SVG (ex: M 10 10 L 100 100)</label><input type="text" .value="${this._config['f'+i+'_p'] || ''}" @input="${e => this._up('f'+i+'_p', e.target.value)}"></div>
+                <label>Activer le flux</label><input type="checkbox" .checked="${this._config['f'+i+'_en']}" @change="${e => this._up('f'+i+'_en', e.target.checked)}">
+                <div class="field"><label>Tracé SVG</label><input type="text" placeholder="M 10 10 L 100 100" .value="${this._config['f'+i+'_p'] || ''}" @input="${e => this._up('f'+i+'_p', e.target.value)}"></div>
                 <div class="field"><label>Sensor Puissance (W)</label><input list="ents" .value="${this._config['f'+i+'_s'] || ''}" @input="${e => this._up('f'+i+'_s', e.target.value)}"></div>
-                <div class="field"><label>Couleur</label><input type="color" .value="${this._config['f'+i+'_c'] || '#00ffff'}" @input="${e => this._up('f'+i+'_c', e.target.value)}"></div>
-                <div class="field"><label>Épaisseur</label><input type="number" min="1" max="10" .value="${this._config['f'+i+'_w'] || 3}" @input="${e => this._up('f'+i+'_w', e.target.value)}"></div>
+                <div class="row">
+                   <div class="field"><label>Couleur</label><input type="color" .value="${this._config['f'+i+'_c'] || '#00ffff'}" @input="${e => this._up('f'+i+'_c', e.target.value)}"></div>
+                   <div class="field"><label>Épaisseur</label><input type="number" .value="${this._config['f'+i+'_w'] || 3}" @input="${e => this._up('f'+i+'_w', e.target.value)}"></div>
+                </div>
               </div>
             </details>
           `)}<datalist id="ents">${entities.map(e => html`<option value="${e}">`)}</datalist>`;
@@ -85,15 +88,11 @@
       const h = c.card_height || 400;
 
       return html`
-        <ha-card style="width:${w}px; height:${h}px; border:1px solid ${c.border_color||'#00ffff'}; background: url('${c.background_image}') no-repeat center center; background-size:cover; position:relative; overflow:hidden;">
+        <ha-card style="width:${w}px; height:${h}px; border:1px solid ${c.border_color||'#00ffff'}; position:relative; overflow:hidden; background-color: #000;">
           
+          <img src="${c.background_image}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit: cover; z-index:1;">
+
           <svg style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:5; pointer-events:none;" viewBox="0 0 ${w} ${h}">
-            <defs>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="1.5" result="blur"></feGaussianBlur>
-                <feComposite in="SourceGraphic" in2="blur" operator="over"></feComposite>
-              </filter>
-            </defs>
             ${[1,2,3,4,5,6,7,8,9,10].map(i => this._drawFlow(i))}
           </svg>
 
@@ -116,24 +115,23 @@
       const width = parseFloat(c['f'+i+'_w']) || 3;
       
       let val = 0;
-      let hasData = false;
       if (sensorId && this.hass.states[sensorId]) {
         val = parseFloat(this.hass.states[sensorId].state) || 0;
-        hasData = true;
       } else {
-        val = 500; // Mode démo si pas de sensor
+        val = 500; // Mode test si aucun sensor n'est lié
       }
       
-      if (hasData && Math.abs(val) < 1) return html``;
+      if (val === 0 && sensorId) return html``;
 
-      const speed = Math.max(0.5, 10 - (Math.abs(val) / 200));
+      // Animation simplifiée ultra-compatible
+      const speed = Math.max(0.5, 10 - (Math.abs(val) / 250));
       const isReverse = val < 0;
 
       return html`
-        <g filter="url(#glow)">
-          <path d="${pathData}" fill="none" stroke="${color}" stroke-width="${width}" stroke-opacity="0.2" stroke-linecap="round"/>
-          <path d="${pathData}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="8,25" stroke-linecap="round">
-            <animate attributeName="stroke-dashoffset" from="${isReverse ? -100 : 100}" to="0" dur="${speed}s" repeatCount="indefinite" />
+        <g>
+          <path d="${pathData}" fill="none" stroke="${color}" stroke-width="${width}" opacity="0.1" />
+          <path d="${pathData}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="10,20">
+            <animate attributeName="stroke-dashoffset" from="${isReverse ? -120 : 120}" to="0" dur="${speed}s" repeatCount="indefinite" />
           </path>
         </g>
       `;
@@ -144,9 +142,8 @@
       if (!c.solar_forecast_enabled) return '';
       const w = c.weather_entity ? this.hass.states[c.weather_entity] : null;
       const f = c.sensor_solar_forecast ? this.hass.states[c.sensor_solar_forecast] : null;
-      const icons = {'sunny':'mdi:weather-sunny','clear-night':'mdi:weather-night','cloudy':'mdi:weather-cloudy','fog':'mdi:weather-fog','hail':'mdi:weather-hail','lightning':'mdi:weather-lightning','lightning-rainy':'mdi:weather-lightning-rainy','partlycloudy':'mdi:weather-partly-cloudy','pouring':'mdi:weather-pouring','rainy':'mdi:weather-rainy','snowy':'mdi:weather-snowy','snowy-rainy':'mdi:weather-snowy-rainy','windy':'mdi:weather-windy'};
-      return html`<div class="sensor-block" style="left:${c.solar_forecast_x}px; top:${c.solar_forecast_y}px; color:${c.solar_forecast_color || '#00FFFF'};">
-          ${w ? html`<ha-icon icon="${icons[w.state]||'mdi:weather-cloudy'}" style="--mdc-icon-size:${c.weather_icon_size||40}px;"></ha-icon><div style="font-size:0.7em;">${w.attributes.temperature}°C</div>`:''}
+      return html`<div class="sensor-block" style="left:${c.solar_forecast_x}px; top:${c.solar_forecast_y}px; color:${c.solar_forecast_color || '#00FFFF'}; text-align:center;">
+          ${w ? html`<ha-icon icon="mdi:weather-${w.state.replace('partlycloudy','partly-cloudy')}" style="--mdc-icon-size:${c.weather_icon_size||40}px;"></ha-icon><div style="font-size:0.7em;">${w.attributes.temperature}°C</div>`:''}
           ${f ? html`<div style="font-size:${c.solar_forecast_size||16}px; font-weight:bold;">${f.state} W</div>`:''}
       </div>`;
     }
@@ -172,9 +169,9 @@
       </div>`;
     }
 
-    static get styles() { return css`.sensor-block{position:absolute;font-weight:bold;text-shadow:1px 1px 3px rgba(0,0,0,0.9);white-space:nowrap;line-height:1.1;display:flex;flex-direction:column;pointer-events:none;align-items:center;}.sensor-name{font-size:0.65em;opacity:0.85;text-transform:uppercase}.bar{background:rgba(0,0,0,0.5);border-radius:2px;overflow:hidden;margin-top:2px}`; }
+    static get styles() { return css`.sensor-block{position:absolute;font-weight:bold;text-shadow:1px 1px 3px rgba(0,0,0,1);white-space:nowrap;line-height:1.1;display:flex;flex-direction:column;pointer-events:none;align-items:center;}.sensor-name{font-size:0.65em;opacity:0.85;text-transform:uppercase}.bar{background:rgba(0,0,0,0.6);border-radius:2px;overflow:hidden;margin-top:2px}`; }
   }
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Master V15", preview: true });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Master V16", preview: true });
 })();
