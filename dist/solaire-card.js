@@ -8,7 +8,7 @@
     
     constructor() {
       super();
-      this._tab = 'general'; // Onglet par défaut
+      this._tab = 'solar'; 
     }
 
     setConfig(config) { this._config = config; }
@@ -19,12 +19,12 @@
 
       return html`
         <div class="editor-container">
-          <div class="toolbar">
-            <button class="${this._tab === 'general' ? 'active' : ''}" @click="${() => this._tab = 'general'}">⚙️ Général</button>
-            <button class="${this._tab === 'solar' ? 'active' : ''}" @click="${() => this._tab = 'solar'}">☀️ Panneaux</button>
+          <div class="nav-tabs">
+            <button class="${this._tab === 'solar' ? 'active' : ''}" @click="${() => this._tab = 'solar'}">☀️ Solaire</button>
             <button class="${this._tab === 'house' ? 'active' : ''}" @click="${() => this._tab = 'house'}">🏠 Maison</button>
             <button class="${this._tab === 'battery' ? 'active' : ''}" @click="${() => this._tab = 'battery'}">🔋 Batterie</button>
             <button class="${this._tab === 'grid' ? 'active' : ''}" @click="${() => this._tab = 'grid'}">⚡ Linky</button>
+            <button class="${this._tab === 'gen' ? 'active' : ''}" @click="${() => this._tab = 'gen'}">⚙️ Général</button>
           </div>
 
           <div class="content">
@@ -36,68 +36,65 @@
 
     _renderTabContent(entities) {
       switch(this._tab) {
-        case 'general':
-          return html`
-            <div class="tab-pane">
-              <h3>Réglages Généraux</h3>
-              ${this._renderInput("Titre", "card_title")}
-              ${this._renderInput("Image de fond (/local/...)", "background_image")}
-              ${this._renderInput("Couleur Bordure", "border_color", "color")}
-              <label>Effet de bordure</label>
-              <select .value="${this._config.border_effect || 'none'}" data-config="border_effect" @change="${this._handleChanged}">
-                <option value="none">Fixe</option>
-                <option value="shimmer">Scintillant (Shimmer)</option>
-                <option value="roller">Rotation (Roller)</option>
-              </select>
-            </div>`;
-        
         case 'solar':
           return html`
-            <div class="tab-pane">
-              <h3>Panneaux Solaires</h3>
-              ${this._renderEntityPicker("Capteur PV 1", "sensor_pv1", entities)}
-              ${this._renderInput("Position X (px)", "pv1_x", "number")}
-              ${this._renderInput("Position Y (px)", "pv1_y", "number")}
-              ${this._renderInput("Couleur Texte", "pv1_color", "color")}
-              <hr>
-              ${this._renderEntityPicker("Capteur PV 2 (Spa)", "sensor_pv2", entities)}
-              ${this._renderInput("Position X (px)", "pv2_x", "number")}
-            </div>`;
-
+            <div class="section-title">PANNEAUX SOLAIRES</div>
+            ${this._renderGroup("Panneaux MAISON", "pv_m", entities)}
+            ${this._renderGroup("Panneaux SPA", "pv_s", entities)}
+            ${this._renderGroup("Panneaux IBC", "pv_i", entities)}
+          `;
         case 'house':
           return html`
-            <div class="tab-pane">
-              <h3>Consommation Maison</h3>
-              ${this._renderEntityPicker("Capteur Maison", "sensor_home", entities)}
-              ${this._renderInput("Position X", "home_x", "number")}
-              ${this._renderInput("Position Y", "home_y", "number")}
-            </div>`;
-
+            <div class="section-title">CONSOMMATION MAISON</div>
+            ${this._renderGroup("Appareils / Ecojoko", "home", entities)}
+            ${this._renderGroup("Pompe à Chaleur", "pac", entities)}
+          `;
         case 'battery':
           return html`
-            <div class="tab-pane">
-              <h3>Batteries (Venus/Storcube)</h3>
-              ${this._renderEntityPicker("Niveau SoC %", "sensor_bat_soc", entities)}
-              ${this._renderEntityPicker("Puissance W", "sensor_bat_pwr", entities)}
-              ${this._renderInput("Position X", "bat_x", "number")}
-            </div>`;
-
+            <div class="section-title">BATTERIES (VENUS / STORCUBE)</div>
+            ${this._renderGroup("Batterie Principale", "bat1", entities)}
+            ${this._renderGroup("Batterie Secondaire", "bat2", entities)}
+          `;
         case 'grid':
           return html`
-            <div class="tab-pane">
-              <h3>Réseau Linky</h3>
-              ${this._renderEntityPicker("Capteur Linky", "sensor_grid", entities)}
-              ${this._renderInput("Position X", "grid_x", "number")}
-            </div>`;
+            <div class="section-title">RÉSEAU ÉLECTRIQUE (LINKY)</div>
+            ${this._renderGroup("Import / Export", "grid", entities)}
+          `;
+        case 'gen':
+          return html`
+            <div class="section-title">DESIGN GÉNÉRAL</div>
+            ${this._renderField("Titre", "card_title", "text")}
+            ${this._renderField("Image de fond", "background_image", "text")}
+            ${this._renderField("Couleur Bordure", "border_color", "color")}
+            <div class="field">
+                <label>Effet Bordure</label>
+                <select .value="${this._config.border_effect || 'none'}" data-config="border_effect" @change="${this._handleChanged}">
+                    <option value="none">Aucun</option>
+                    <option value="shimmer">Scintillant</option>
+                    <option value="roller">Roller (Néon tournant)</option>
+                </select>
+            </div>
+          `;
       }
     }
 
-    _renderInput(label, configKey, type = "text") {
+    _renderGroup(title, prefix, entities) {
       return html`
-        <div class="field">
-          <label>${label}</label>
-          <input type="${type}" .value="${this._config[configKey] || ''}" data-config="${configKey}" @input="${this._handleChanged}">
-        </div>`;
+        <details class="group-box">
+          <summary>${title}</summary>
+          <div class="group-content">
+            ${this._renderEntityPicker("Capteur Puissance (W)", `${prefix}_entity`, entities)}
+            <div class="row">
+              ${this._renderField("Pos X (px)", `${prefix}_x`, "number")}
+              ${this._renderField("Pos Y (px)", `${prefix}_y`, "number")}
+            </div>
+            <div class="row">
+              ${this._renderField("Taille", `${prefix}_size`, "number")}
+              ${this._renderField("Couleur", `${prefix}_color`, "color")}
+            </div>
+          </div>
+        </details>
+      `;
     }
 
     _renderEntityPicker(label, configKey, entities) {
@@ -106,6 +103,14 @@
           <label>${label}</label>
           <input list="ent-list" .value="${this._config[configKey] || ''}" data-config="${configKey}" @input="${this._handleChanged}">
           <datalist id="ent-list">${entities.map(e => html`<option value="${e}">`)}</datalist>
+        </div>`;
+    }
+
+    _renderField(label, configKey, type) {
+      return html`
+        <div class="field">
+          <label>${label}</label>
+          <input type="${type}" .value="${this._config[configKey] || ''}" data-config="${configKey}" @input="${this._handleChanged}">
         </div>`;
     }
 
@@ -118,15 +123,21 @@
 
     static get styles() {
       return css`
-        .editor-container { background: #1a1a1a; color: white; padding: 10px; font-family: system-ui; }
-        .toolbar { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        button { background: #333; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; transition: 0.3s; }
-        button.active { background: #00ffff; color: black; font-weight: bold; box-shadow: 0 0 10px #00ffff; }
-        .tab-pane { animation: fadeIn 0.3s; }
+        .editor-container { background: #1c1c1c; color: white; padding: 10px; font-family: sans-serif; }
+        .nav-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid #444; padding-bottom: 8px; margin-bottom: 10px; }
+        .nav-tabs button { background: #333; color: #ccc; border: none; padding: 8px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
+        .nav-tabs button.active { background: #00ffff; color: black; font-weight: bold; }
+        .section-title { color: #00ffff; font-weight: bold; margin: 15px 0 5px 0; text-transform: uppercase; font-size: 0.9em; }
+        .group-box { background: #2a2a2a; border: 1px solid #444; border-radius: 5px; margin-bottom: 8px; }
+        summary { padding: 8px; cursor: pointer; font-weight: bold; color: #00f9f9; list-style: none; }
+        summary::before { content: "▶ "; font-size: 0.8em; }
+        details[open] summary::before { content: "▼ "; }
+        .group-content { padding: 10px; border-top: 1px solid #444; }
         .field { margin-bottom: 10px; display: flex; flex-direction: column; }
-        label { font-size: 0.9em; margin-bottom: 4px; color: #00ffff; }
-        input, select { background: #252525; border: 1px solid #444; color: white; padding: 8px; border-radius: 4px; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        label { font-size: 0.8em; color: #aaa; margin-bottom: 3px; }
+        input, select { background: #111; border: 1px solid #555; color: white; padding: 6px; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        input:focus { border-color: #00ffff; outline: none; }
       `;
     }
   }
@@ -139,16 +150,38 @@
     
     setConfig(config) { this.config = config; }
 
+    _renderValue(prefix) {
+        const entity = this.config[`${prefix}_entity`];
+        const state = this.hass.states[entity]?.state || "0";
+        const x = this.config[`${prefix}_x`] || 0;
+        const y = this.config[`${prefix}_y`] || 0;
+        const color = this.config[`${prefix}_color`] || "#ffffff";
+        const size = this.config[`${prefix}_size`] || 14;
+
+        if (!entity) return html``;
+
+        return html`
+          <div class="data-text" style="left:${x}px; top:${y}px; color:${color}; font-size:${size}px;">
+            ${state} W
+          </div>
+        `;
+    }
+
     render() {
       if (!this.hass || !this.config) return html``;
-      const pv1 = this.hass.states[this.config.sensor_pv1]?.state || "0";
       
       return html`
-        <ha-card class="${this.config.border_effect}" style="border: 2px solid ${this.config.border_color}; background-image: url('${this.config.background_image}'); background-size: cover;">
-          <div class="main-container">
-             <div class="pv1-text" style="left: ${this.config.pv1_x}px; top: ${this.config.pv1_y}px; color: ${this.config.pv1_color};">
-               ${pv1} W
-             </div>
+        <ha-card class="${this.config.border_effect}" style="border: 2px solid ${this.config.border_color}; background-image: url('${this.config.background_image}'); background-size: cover; height: 450px;">
+          <div class="main-overlay">
+            <div class="title">${this.config.card_title}</div>
+            ${this._renderValue("pv_m")}
+            ${this._renderValue("pv_s")}
+            ${this._renderValue("pv_i")}
+            ${this._renderValue("home")}
+            ${this._renderValue("pac")}
+            ${this._renderValue("bat1")}
+            ${this._renderValue("bat2")}
+            ${this._renderValue("grid")}
           </div>
         </ha-card>
       `;
@@ -156,16 +189,15 @@
 
     static get styles() {
       return css`
-        ha-card { height: 400px; position: relative; overflow: hidden; transition: 0.3s; }
-        .main-container { width: 100%; height: 100%; background: rgba(0,0,0,0.3); position: relative; }
-        .pv1-text { position: absolute; font-weight: bold; font-size: 1.2em; text-shadow: 1px 1px 3px black; }
-
-        /* EFFET SCINTILLANT */
-        .shimmer { animation: shimmer-box 2s infinite alternate; }
-        @keyframes shimmer-box { from { box-shadow: 0 0 5px #00ffff; } to { box-shadow: 0 0 20px #00ffff; } }
-
-        /* EFFET ROLLER (BORDER ANIMATION) */
-        .roller { border-image: conic-gradient(from var(--angle), #00ffff, #ff00ff, #00ffff) 1; animation: rotate 3s linear infinite; }
+        ha-card { position: relative; overflow: hidden; border-radius: 12px; }
+        .main-overlay { width: 100%; height: 100%; background: rgba(0,0,0,0.2); position: relative; }
+        .title { text-align: center; color: #00ffff; font-size: 20px; font-weight: bold; padding: 10px; text-shadow: 0 0 10px #00ffff; }
+        .data-text { position: absolute; font-weight: bold; text-shadow: 1px 1px 4px black; white-space: nowrap; transition: all 0.3s; }
+        
+        .shimmer { animation: shimmer 1.5s infinite alternate; }
+        @keyframes shimmer { from { box-shadow: 0 0 5px #00ffff; } to { box-shadow: 0 0 25px #00ffff; } }
+        
+        .roller { border-image: conic-gradient(from var(--angle), #00ffff, #ff00ff, #00ffff) 1; animation: rotate 4s linear infinite; }
         @property --angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
         @keyframes rotate { to { --angle: 360deg; } }
       `;
@@ -174,5 +206,5 @@
   customElements.define("solaire-card", SolaireCard);
 
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card Pro", preview: true });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Pro (Onglets)", preview: true });
 })();
