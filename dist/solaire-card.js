@@ -4,7 +4,7 @@
   const css = LitElement.prototype.css;
 
   class SolaireCard extends LitElement {
-    static get properties() { return { hass: {}, config: {} }; }
+    static get properties() { return { hass: {}, config: {}, _mX: {type: Number}, _mY: {type: Number} }; }
     setConfig(config) { this.config = config; this._offset = 0; }
     static getConfigElement() { return document.createElement("solaire-card-editor"); }
 
@@ -22,27 +22,48 @@
       if (!cv) return;
       const ctx = cv.getContext('2d');
       ctx.clearRect(0, 0, cv.width, cv.height);
-      for (let i = 1; i <= 15; i++) {
-        const pD = this.config['f'+i+'_p'];
-        if (!this.config['f'+i+'_en'] || !pD) continue;
-        const s = this.config['f'+i+'_s'], v = (s && this.hass.states[s]) ? parseFloat(this.hass.states[s].state) : 500;
-        if (v === 0 && s) continue;
+      const c = this.config;
+
+      if (c.show_grid) {
         ctx.save();
-        ctx.strokeStyle = this.config['f'+i+'_c'] || '#ff0';
-        ctx.lineWidth = this.config['f'+i+'_w'] || 3;
-        ctx.lineCap = "round"; ctx.setLineDash([10, 20]);
-        ctx.lineDashOffset = this._offset * 12 * ((Math.abs(v)/500)+0.3) * (v < 0 ? 1 : -1);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+        ctx.lineWidth = 0.5;
+        for (let x = 0; x <= cv.width; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cv.height); ctx.stroke(); }
+        for (let y = 0; y <= cv.height; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cv.width, y); ctx.stroke(); }
+        ctx.restore();
+      }
+
+      for (let i = 1; i <= 15; i++) {
+        const pD = c['f'+i+'_p'];
+        if (!c['f'+i+'_en'] || !pD) continue;
+        const s = c['f'+i+'_s'], v = (s && this.hass.states[s]) ? parseFloat(this.hass.states[s].state) : 500;
+        if (v === 0 && s) continue;
+        
+        ctx.save();
+        ctx.strokeStyle = c['f'+i+'_c'] || '#ff0';
+        ctx.lineWidth = c['f'+i+'_w'] || 3;
+        ctx.lineCap = "round";
+        
+        // REGLAGES DYNAMIQUES DU STYLE
+        const dashLen = c.dash_size || 10;
+        const dashGap = c.dash_gap || 20;
+        ctx.setLineDash([dashLen, dashGap]);
+        
+        // REGLAGE DYNAMIQUE DE LA VITESSE
+        const speedBase = c.flow_speed || 6;
+        ctx.lineDashOffset = this._offset * speedBase * ((Math.abs(v)/500)+0.3) * (v < 0 ? 1 : -1);
+        
         ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 4;
         ctx.stroke(new Path2D(pD));
         ctx.restore();
       }
     }
 
-    _fmt(val, unit) {
-      let v = parseFloat(val);
-      if (isNaN(v)) return val;
-      if (Math.abs(v) >= 1000 && unit === 'W') return (v / 1000).toFixed(2) + ' kW';
-      return v.toFixed(0) + ' ' + unit;
+    _handleMouseMove(e) {
+      if (!this.config.show_grid) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      this._mX = Math.round(e.clientX - rect.left);
+      this._mY = Math.round(e.clientY - rect.top);
     }
 
     render() {
@@ -51,11 +72,10 @@
       const w = c.card_width || 500;
       const h = c.card_height || 400;
       return html`
-        <ha-card style="width:${w}px; height:${h}px; position:relative; overflow:hidden; background:#000; border:2px solid ${c.border_color||'#333'}; border-radius:15px;">
+        <ha-card @mousemove="${this._handleMouseMove}" style="width:${w}px; height:${h}px; position:relative; overflow:hidden; background:#000; border:2px solid ${c.border_color||'#333'}; border-radius:15px; cursor:${c.show_grid?'crosshair':'default'};">
           <img src="${c.background_image}" style="position:absolute; width:100%; height:100%; object-fit:cover; object-position: center center; z-index:1;">
-          
           <canvas id="flowCanvas" width="${w}" height="${h}" style="position:absolute; z-index:5; pointer-events:none;"></canvas>
-          
+          ${c.show_grid ? html`<div style="position:absolute; top:5px; left:5px; background:rgba(255,0,0,0.8); color:white; padding:2px 8px; border-radius:4px; z-index:20; font-size:10px; font-weight:bold; font-family:monospace;">X: ${this._mX} | Y: ${this._mY}</div>` : ''}
           <div style="position:absolute; width:100%; height:100%; z-index:10; pointer-events:none;">
             ${['s1','s2','s3','s4','s5','h1','h2','h3','h4','h5','b1','b2','b3','g1','g2'].map(p => this._renderItem(p))}
             ${this._renderWeather()}
@@ -90,6 +110,13 @@
           <div style="font-weight:bold; font-size:0.85em; color:${c.w_tc||'#0cf'};">${w.state.toUpperCase()}</div>
           ${f ? html`<div class="val" style="color:#ff0; font-size:0.9em;">☀️ ${this._fmt(f.state,'W')}</div>` : ''}
         </div>`;
+    }
+
+    _fmt(val, unit) {
+      let v = parseFloat(val);
+      if (isNaN(v)) return val;
+      if (Math.abs(v) >= 1000 && unit === 'W') return (v / 1000).toFixed(2) + ' kW';
+      return v.toFixed(0) + ' ' + unit;
     }
 
     static get styles() { return css`
@@ -128,9 +155,17 @@
 
     _renderTab(ents) {
       const c = this._config, t = this._tab;
-      if(t === 'flow') return html`${[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(i => html`<details style="background:#252525; margin-top:5px; border:1px solid #444;"><summary style="padding:8px; cursor:pointer; color:#e91e63">Flux #${i} ${c['f'+i+'_en']?'✅':''}</summary><div style="padding:10px; display:grid; gap:8px;">Activer <input type="checkbox" .checked="${c['f'+i+'_en']}" @change="${e=>this._up('f'+i+'_en',e.target.checked)}">Couleur <input type="color" .value="${c['f'+i+'_c']||'#ff0'}" @input="${e=>this._up('f'+i+'_c',e.target.value)}">Tracé <input type="text" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}">Watts <input list="el" .value="${c['f'+i+'_s']||''}" @input="${e=>this._up('f'+i+'_s',e.target.value)}" style="width:100%; background:#333; color:#fff; border:1px solid #555; padding:5px;"></div></details>`)}`;
+      if(t === 'flow') return html`
+        <div style="background:#252525; padding:10px; border-radius:5px; margin-bottom:10px;">
+          <b>🛠️ RÉGLAGE GLOBAL DES FLUX</b><br><br>
+          Vitesse : <input type="range" min="1" max="20" .value="${c.flow_speed||6}" @change="${e=>this._up('flow_speed',e.target.value)}"> (${c.flow_speed||6})<br>
+          Taille Point : <input type="range" min="2" max="30" .value="${c.dash_size||10}" @change="${e=>this._up('dash_size',e.target.value)}"><br>
+          Espace : <input type="range" min="5" max="50" .value="${c.dash_gap||20}" @change="${e=>this._up('dash_gap',e.target.value)}">
+        </div>
+        ${[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(i => html`<details style="background:#252525; margin-top:5px; border:1px solid #444;"><summary style="padding:8px; cursor:pointer; color:#e91e63">Flux #${i} ${c['f'+i+'_en']?'✅':''}</summary><div style="padding:10px; display:grid; gap:8px;">Activer <input type="checkbox" .checked="${c['f'+i+'_en']}" @change="${e=>this._up('f'+i+'_en',e.target.checked)}">Couleur <input type="color" .value="${c['f'+i+'_c']||'#ff0'}" @input="${e=>this._up('f'+i+'_c',e.target.value)}">Tracé <input type="text" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}">Watts <input list="el" .value="${c['f'+i+'_s']||''}" @input="${e=>this._up('f'+i+'_s',e.target.value)}" style="width:100%; background:#333; color:#fff; border:1px solid #555; padding:5px;">Épaisseur <input type="number" .value="${c['f'+i+'_w']||3}" @input="${e=>this._up('f'+i+'_w',e.target.value)}"></div></details>`)}`;
+      
       if(t === 'weather') return html`Activer <input type="checkbox" .checked="${c.weather_en}" @change="${e=>this._up('weather_en',e.target.checked)}"> Cadre <input type="checkbox" .checked="${c.w_box}" @change="${e=>this._up('w_box',e.target.checked)}"><br><br>Entité Météo <input list="el" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}" style="width:100%; background:#333; color:#fff; padding:5px;"><br>X <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}"> Rot <input type="number" .value="${c.w_rot}" @input="${e=>this._up('w_rot',e.target.value)}"><br>Couleur Titre <input type="color" .value="${c.w_tc||'#0cf'}" @input="${e=>this._up('w_tc',e.target.value)}"> Valeur <input type="color" .value="${c.w_vc||'#fff'}" @input="${e=>this._up('w_vc',e.target.value)}">`;
-      if(t === 'gen') return html`Dimensions <div style="display:flex; gap:5px;"><input type="number" .value="${c.card_width||500}" @input="${e=>this._up('card_width',e.target.value)}" style="width:50%"><input type="number" .value="${c.card_height||400}" @input="${e=>this._up('card_height',e.target.value)}" style="width:50%"></div><br>Image Fond <input type="text" .value="${c.background_image||''}" @input="${e=>this._up('background_image',e.target.value)}" style="width:100%; background:#333; color:#fff; padding:5px;"><br>Bordure <input type="color" .value="${c.border_color||'#333'}" @input="${e=>this._up('border_color',e.target.value)}">`;
+      if(t === 'gen') return html`Dimensions <div style="display:flex; gap:5px;"><input type="number" .value="${c.card_width||500}" @input="${e=>this._up('card_width',e.target.value)}" style="width:50%"><input type="number" .value="${c.card_height||400}" @input="${e=>this._up('card_height',e.target.value)}" style="width:50%"></div><br>Image Fond <input type="text" .value="${c.background_image||''}" @input="${e=>this._up('background_image',e.target.value)}" style="width:100%; background:#333; color:#fff; padding:5px;"><br>Bordure <input type="color" .value="${c.border_color||'#333'}" @input="${e=>this._up('border_color',e.target.value)}"><br><b>Afficher Grille Repère</b> <input type="checkbox" .checked="${c.show_grid}" @change="${e=>this._up('show_grid',e.target.checked)}">`;
       const g = {solar:['s1','s2','s3','s4','s5'], house:['h1','h2','h3','h4','h5'], bat:['b1','b2','b3']}[t], col = {solar:'#ffeb3b', house:'#2196f3', bat:'#4caf50'}[t];
       return (g||[]).map(p => html`<details style="background:#252525; margin-top:5px; border:1px solid #444;"><summary style="padding:8px; cursor:pointer; color:${col}">${p.toUpperCase()} ${c[p+'_ent']?'✅':''}</summary><div style="padding:10px; display:grid; gap:8px;">Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}"> Watts <input list="el" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}" style="width:100%; background:#333; color:#fff; padding:5px;">kWh Jour <input list="el" .value="${c[p+'_ent_day']||''}" @input="${e=>this._up(p+'_ent_day',e.target.value)}" style="width:100%; background:#333; color:#fff; padding:5px;">X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"> Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}"> Rot <input type="number" .value="${c[p+'_rot']}" @input="${e=>this._up(p+'_rot',e.target.value)}"><br>Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}"> Titre <input type="color" .value="${c[p+'_tc']||'#aaa'}" @input="${e=>this._up(p+'_tc',e.target.value)}"> Valeur <input type="color" .value="${c[p+'_vc']||'#fff'}" @input="${e=>this._up(p+'_vc',e.target.value)}">${p.startsWith('b')?html`Jauge W <input type="number" .value="${c[p+'_w']}" @input="${e=>this._up(p+'_w',e.target.value)}"> H <input type="number" .value="${c[p+'_h']}" @input="${e=>this._up(p+'_h',e.target.value)}">`:''}</div></details>`);
     }
@@ -138,5 +173,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Master V32 CENTER", preview: true });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Master V34 ZEN", preview: true });
 })();
