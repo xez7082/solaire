@@ -15,10 +15,9 @@
       return html`
         <div class="editor-container">
           <div class="nav-tabs">
-            <button class="${this._tab === 'solar' ? 'active' : ''}" @click="${() => this._tab = 'solar'}">☀️ Solaire</button>
-            <button class="${this._tab === 'house' ? 'active' : ''}" @click="${() => this._tab = 'house'}">🏠 Maison</button>
-            <button class="${this._tab === 'bat' ? 'active' : ''}" @click="${() => this._tab = 'bat'}">🔋 Bat</button>
+            <button class="${this._tab === 'solar' ? 'active' : ''}" @click="${() => this._tab = 'solar'}">☀️ Sensors</button>
             <button class="${this._tab === 'flow' ? 'active' : ''}" @click="${() => this._tab = 'flow'}">🌊 Flux</button>
+            <button class="${this._tab === 'forecast' ? 'active' : ''}" @click="${() => this._tab = 'forecast'}">📊 Prévis.</button>
             <button class="${this._tab === 'gen' ? 'active' : ''}" @click="${() => this._tab = 'gen'}">⚙️ Gen</button>
           </div>
           <div class="content">${this._renderTabContent(entities)}</div>
@@ -27,6 +26,21 @@
     }
 
     _renderTabContent(entities) {
+      if (this._tab === 'forecast') {
+        return html`
+          <div class="section-title">PRÉVISIONS SOLAIRES</div>
+          <div class="field"><label>Activer</label><input type="checkbox" .checked="${this._config.solar_forecast_enabled}" @change="${e => this._up('solar_forecast_enabled', e.target.checked)}"></div>
+          ${this._renderField("Sensor Prévision", "sensor_solar_forecast", "text", entities)}
+          <div class="row">
+            ${this._renderField("Pos X", "solar_forecast_x", "number")}
+            ${this._renderField("Pos Y", "solar_forecast_y", "number")}
+          </div>
+          <div class="row">
+            ${this._renderField("Taille", "solar_forecast_size", "number")}
+            ${this._renderField("Couleur", "solar_forecast_color", "color")}
+          </div>
+        `;
+      }
       if (this._tab === 'flow') {
         return html`
           <div class="section-title">FLUX ÉNERGÉTIQUES</div>
@@ -61,7 +75,7 @@
           <summary>${this._config[p+'_entity']?'✔️':'⚪'} ${this._config[p+'_name']||p}</summary>
           <div class="group-content">
             ${this._renderField("Nom", p+"_name", "text")}
-            ${this._renderEntityPicker("Sensor", p+"_entity", entities)}
+            ${this._renderField("Sensor", p+"_entity", "text", entities)}
             <div class="row">${this._renderField("X", p+"_x", "number")}${this._renderField("Y", p+"_y", "number")}</div>
             <div class="row">${this._renderField("Taille", p+"_size", "number")}${this._renderField("Rot", p+"_rot", "number")}</div>
             ${isBat ? html`<div class="row">${this._renderField("W Jauge", p+"_w", "number")}${this._renderField("H Jauge", p+"_h", "number")}</div>`:''}
@@ -70,8 +84,15 @@
         </details>`;
     }
 
-    _renderField(l, k, t) { return html`<div class="field"><label>${l}</label><input type="${t}" .value="${this._config[k]||''}" @input="${e => this._up(k, e.target.value)}"></div>`; }
-    _renderEntityPicker(l, k, ents) { return html`<div class="field"><label>${l}</label><input list="ents" .value="${this._config[k]||''}" @input="${e => this._up(k, e.target.value)}"><datalist id="ents">${ents.map(e => html`<option value="${e}">`)}</datalist></div>`; }
+    _renderField(l, k, t, ents = null) {
+      return html`
+        <div class="field">
+          <label>${l}</label>
+          <input type="${t}" list="${ents ? 'ents' : ''}" .value="${this._config[k]||''}" @input="${e => this._up(k, e.target.value)}">
+          ${ents ? html`<datalist id="ents">${ents.map(e => html`<option value="${e}">`)}</datalist>` : ''}
+        </div>`;
+    }
+    
     _up(k, v) { this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: { ...this._config, [k]: v } }, bubbles: true, composed: true })); }
     
     static get styles() { return css`.editor-container{background:#1a1a1a;color:white;padding:10px;font-family:sans-serif}.nav-tabs{display:flex;gap:3px;margin-bottom:10px}button{background:#333;color:#eee;border:none;padding:8px;border-radius:4px;cursor:pointer;flex:1;font-size:0.7em}button.active{background:#00ffff;color:black;font-weight:bold}.group-box{background:#252525;border:1px solid #444;margin-bottom:5px}summary{padding:8px;cursor:pointer;color:#00ffff;font-size:0.85em}.group-content{padding:10px;background:#111}.field{margin-bottom:8px;display:flex;flex-direction:column}label{font-size:0.7em;color:gray}input{background:#222;border:1px solid #555;color:white;padding:5px;width:100%;box-sizing:border-box}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.section-title{color:#ff00ff;font-weight:bold;margin-bottom:8px;text-transform:uppercase}`; }
@@ -111,9 +132,21 @@
           <div style="position:relative; z-index:2;">
             ${['s1','s2','s3','s4','s5','h1','h2','h3','h4','h5'].map(p => this._renderData(p))}
             ${['b1','b2','b3'].map(p => this._renderBat(p))}
+            ${this._renderForecast()}
           </div>
         </ha-card>
       `;
+    }
+
+    _renderForecast() {
+      const c = this.config;
+      if (!c.solar_forecast_enabled || !c.sensor_solar_forecast || !this.hass.states[c.sensor_solar_forecast]) return '';
+      const state = this.hass.states[c.sensor_solar_forecast].state;
+      return html`
+        <div class="sensor-block" style="left:${c.solar_forecast_x}px; top:${c.solar_forecast_y}px; color:${c.solar_forecast_color||'#00FFFF'}; font-size:${c.solar_forecast_size||16}px;">
+          <div class="sensor-name">Prévision</div>
+          <div>${state} <small>W</small></div>
+        </div>`;
     }
 
     _renderBat(p) {
@@ -139,5 +172,5 @@
   }
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Master V9", preview: true });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Master V10", preview: true });
 })();
