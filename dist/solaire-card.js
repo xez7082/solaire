@@ -17,7 +17,7 @@
           <div class="nav-tabs">
             <button class="${this._tab === 'solar' ? 'active' : ''}" @click="${() => this._tab = 'solar'}">☀️ Solaire</button>
             <button class="${this._tab === 'house' ? 'active' : ''}" @click="${() => this._tab = 'house'}">🏠 Maison</button>
-            <button class="${this._tab === 'battery' ? 'active' : ''}" @click="${() => this._tab = 'battery'}">🔋 Batterie</button>
+            <button class="${this._tab === 'bat' ? 'active' : ''}" @click="${() => this._tab = 'bat'}">🔋 Batterie</button>
             <button class="${this._tab === 'gen' ? 'active' : ''}" @click="${() => this._tab = 'gen'}">⚙️ Général</button>
           </div>
 
@@ -29,38 +29,36 @@
     }
 
     _renderTabContent(entities) {
-      const categories = { solar: 'Solaire', house: 'Maison', battery: 'Batterie' };
       if (this._tab === 'gen') {
         return html`
-          <div class="section-title">DIMENSIONS & IMAGE</div>
-          <div class="row">
-            ${this._renderField("Largeur (px)", "card_width", "number")}
-            ${this._renderField("Hauteur (px)", "card_height", "number")}
-          </div>
-          ${this._renderField("Image de fond (/local/...)", "background_image", "text")}
+          <div class="section-title">CARTE ET IMAGE</div>
+          <div class="row">${this._renderField("Largeur (px)", "card_width", "number")}${this._renderField("Hauteur (px)", "card_height", "number")}</div>
+          ${this._renderField("Image de fond", "background_image", "text")}
           ${this._renderField("Couleur Bordure", "border_color", "color")}
         `;
       }
 
-      // Pour les autres onglets, on affiche les groupes prédéfinis (3 par onglet pour l'exemple, extensible)
-      const prefixes = {
-        solar: ['pv1', 'pv2', 'pv3', 'pv4'],
+      // Listes de préfixes pour chaque onglet
+      const mapping = {
+        solar: ['s1', 's2', 's3', 's4', 's5'],
         house: ['h1', 'h2', 'h3', 'h4'],
-        battery: ['b1', 'b2', 'b3']
+        bat: ['b1', 'b2', 'b3']
       };
 
       return html`
-        <div class="section-title">CONFIGURER ${categories[this._tab]}</div>
-        ${prefixes[this._tab].map(p => this._renderGroup(p, entities))}
+        <div class="section-title">CAPTEURS DISPONIBLES</div>
+        <p style="font-size:0.8em; color:#aaa; margin-bottom:10px;">Remplissez l'entité pour activer le capteur.</p>
+        ${mapping[this._tab].map(p => this._renderGroup(p, entities))}
       `;
     }
 
     _renderGroup(prefix, entities) {
+      const isUsed = this._config[prefix + '_entity'] ? '✔️' : '⚪';
       return html`
         <details class="group-box">
-          <summary>${this._config[prefix + '_name'] || 'Capteur vide (' + prefix + ')'}</summary>
+          <summary>${isUsed} ${this._config[prefix + '_name'] || 'Nouveau Capteur ('+prefix+')'}</summary>
           <div class="group-content">
-            ${this._renderField("Nom à afficher", prefix + "_name", "text")}
+            ${this._renderField("Nom (ex: Spa, IBC...)", prefix + "_name", "text")}
             ${this._renderEntityPicker("Entité (Sensor)", prefix + "_entity", entities)}
             <div class="row">
               ${this._renderField("Pos X", prefix + "_x", "number")}
@@ -68,7 +66,7 @@
             </div>
             <div class="row">
               ${this._renderField("Taille", prefix + "_size", "number")}
-              ${this._renderField("Inclinaison (°)", prefix + "_rot", "number")}
+              ${this._renderField("Rotation (°)", prefix + "_rot", "number")}
             </div>
             ${this._renderField("Couleur", prefix + "_color", "color")}
           </div>
@@ -105,23 +103,22 @@
     static get styles() {
       return css`
         .editor-container { background: #1a1a1a; color: white; padding: 10px; font-family: sans-serif; }
-        .nav-tabs { display: flex; gap: 5px; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        button { background: #333; color: #eee; border: none; padding: 8px; border-radius: 4px; cursor: pointer; flex: 1; }
+        .nav-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+        button { background: #333; color: #eee; border: none; padding: 8px; border-radius: 4px; cursor: pointer; flex: 1; font-size: 0.8em; }
         button.active { background: #00ffff; color: black; font-weight: bold; }
         .group-box { background: #252525; border: 1px solid #444; border-radius: 4px; margin-bottom: 5px; }
-        summary { padding: 8px; cursor: pointer; color: #00ffff; font-size: 0.9em; }
-        .group-content { padding: 10px; border-top: 1px solid #444; }
+        summary { padding: 8px; cursor: pointer; color: #00ffff; font-size: 0.9em; list-style: none; }
+        .group-content { padding: 10px; border-top: 1px solid #444; background: #111; }
         .field { margin-bottom: 8px; display: flex; flex-direction: column; }
-        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        label { font-size: 0.75em; color: #aaa; }
-        input { background: #000; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; width: 100%; }
-        .section-title { font-weight: bold; margin-bottom: 10px; color: #ff00ff; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        label { font-size: 0.7em; color: #aaa; }
+        input { background: #222; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        .section-title { font-weight: bold; margin-bottom: 10px; color: #ff00ff; text-transform: uppercase; }
       `;
     }
   }
   customElements.define("solaire-card-editor", SolaireCardEditor);
 
-  // --- LOGIQUE CARTE ---
   class SolaireCard extends LitElement {
     static get properties() { return { hass: {}, config: {} }; }
     static getConfigElement() { return document.createElement("solaire-card-editor"); }
@@ -134,7 +131,6 @@
       const state = this.hass.states[entity].state;
       const name = this.config[prefix + "_name"] || "";
       const unit = this.hass.states[entity].attributes.unit_of_measurement || "";
-      const rotation = this.config[prefix + "_rot"] || 0;
 
       return html`
         <div class="sensor-block" style="
@@ -142,7 +138,7 @@
           top: ${this.config[prefix + '_y']}px; 
           color: ${this.config[prefix + '_color'] || 'white'};
           font-size: ${this.config[prefix + '_size'] || 14}px;
-          transform: rotate(${rotation}deg);
+          transform: rotate(${this.config[prefix + '_rot'] || 0}deg);
         ">
           <div class="sensor-name">${name}</div>
           <div class="sensor-value">${state} <small>${unit}</small></div>
@@ -152,7 +148,7 @@
 
     render() {
       if (!this.hass || !this.config) return html``;
-      const prefixes = ['pv1','pv2','pv3','pv4','h1','h2','h3','h4','b1','b2','b3'];
+      const prefixes = ['s1','s2','s3','s4','s5','h1','h2','h3','h4','b1','b2','b3'];
 
       return html`
         <ha-card style="
@@ -161,24 +157,22 @@
           border: 2px solid ${this.config.border_color || '#00ffff'};
           background-image: url('${this.config.background_image}');
           background-size: 100% 100%;
+          position: relative;
         ">
-          <div class="overlay">
-            ${prefixes.map(p => this._renderData(p))}
-          </div>
+          ${prefixes.map(p => this._renderData(p))}
         </ha-card>
       `;
     }
 
     static get styles() {
       return css`
-        ha-card { position: relative; overflow: hidden; border-radius: 15px; }
-        .overlay { width: 100%; height: 100%; background: rgba(0,0,0,0.1); position: relative; }
-        .sensor-block { position: absolute; font-weight: bold; text-shadow: 2px 2px 4px black; transform-origin: center left; pointer-events: none; }
-        .sensor-name { font-size: 0.65em; opacity: 0.8; }
+        ha-card { overflow: hidden; border-radius: 15px; background-repeat: no-repeat; }
+        .sensor-block { position: absolute; font-weight: bold; text-shadow: 2px 2px 4px black; pointer-events: none; white-space: nowrap; }
+        .sensor-name { font-size: 0.65em; opacity: 0.8; text-transform: uppercase; line-height: 1; }
       `;
     }
   }
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Master", preview: true });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Master V3", preview: true });
 })();
