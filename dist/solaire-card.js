@@ -1,97 +1,73 @@
-import {
-  LitElement,
-  html,
-  css,
-} from "https://unpkg.com/lit-element@2.4.0/lit-element.js?module";
+(function() {
+  const LitElement = Object.getPrototypeOf(customElements.get("ha-panel-lovelace")).prototype.constructor;
+  const html = LitElement.prototype.html;
+  const css = LitElement.prototype.css;
 
-// --- L'ÉDITEUR (INTERFACE VISUELLE) ---
-class SolaireCardEditor extends LitElement {
-  static get properties() {
-    return { hass: {}, _config: {} };
-  }
-  setConfig(config) { this._config = config; }
-
-  _valueChanged(ev) {
-    if (!this._config || !this.hass) return;
-    const target = ev.target;
-    const configValue = target.configValue;
-    const value = ev.detail ? ev.detail.value : target.value;
-
-    const newConfig = { ...this._config, [configValue]: value };
-    const event = new CustomEvent("config-changed", {
-      detail: { config: newConfig },
-      bubbles: true,
-      composed: true,
-    });
-    this.dispatchEvent(event);
-  }
-
-  render() {
-    if (!this.hass || !this._config) return html``;
-    return html`
-      <div style="padding: 20px;">
-        <p style="color: #00ffff; font-weight: bold;">⚙️ CONFIGURATION SOLAIRE</p>
-        <ha-entity-picker 
-          label="Capteur PV Principal"
-          .hass="${this.hass}" 
-          .value="${this._config.sensor_pv1}" 
-          .configValue="${"sensor_pv1"}" 
-          @value-changed="${this._valueChanged}">
-        </ha-entity-picker>
-        <paper-input 
-          label="Image de fond (/local/...)" 
-          .value="${this._config.background_image}" 
-          .configValue="${"background_image"}" 
-          @value-changed="${this._valueChanged}">
-        </paper-input>
-        <paper-input 
-          label="Couleur Néon" 
-          .value="${this._config.border_color}" 
-          .configValue="${"border_color"}" 
-          @value-changed="${this._valueChanged}">
-        </paper-input>
-      </div>
-    `;
-  }
-}
-customElements.define("solaire-card-editor", SolaireCardEditor);
-
-// --- LA CARTE (LOGIQUE) ---
-class SolaireCard extends LitElement {
-  static get properties() {
-    return { hass: {}, config: {} };
-  }
-
-  // CETTE FONCTION FAIT LE LIEN AVEC L'ÉDITEUR
-  static getConfigElement() {
-    return document.createElement("solaire-card-editor");
-  }
-
-  static getStubConfig() {
-    return { sensor_pv1: "", background_image: "/local/post.png", border_color: "#00ffff" };
-  }
-
-  setConfig(config) { this.config = config; }
-
-  render() {
-    if (!this.hass || !this.config) return html``;
-    const state = this.hass.states[this.config.sensor_pv1]?.state || "0";
-    return html`
-      <ha-card style="border: 2px solid ${this.config.border_color}; background-image: url('${this.config.background_image}'); background-size: cover; height: 200px;">
-        <div style="background: rgba(0,0,0,0.5); height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 2em;">
-          ${state} W
+  // --- L'ÉDITEUR ---
+  class SolaireCardEditor extends LitElement {
+    static get properties() { return { hass: {}, _config: {} }; }
+    setConfig(config) { this._config = config; }
+    
+    render() {
+      return html`
+        <div style="padding: 20px; background: #2c3e50; color: white; border-radius: 10px;">
+          <h2 style="color: #00ffff;">⚙️ ÉDITEUR SOLAIRE</h2>
+          <ha-entity-picker
+            .label="${"Choisir un capteur PV"}"
+            .hass="${this.hass}"
+            .value="${this._config.sensor_pv1}"
+            .configValue="${"sensor_pv1"}"
+            @value-changed="${this._handleChanged}"
+          ></ha-entity-picker>
+          <paper-input
+            label="Image de fond"
+            .value="${this._config.background_image}"
+            .configValue="${"background_image"}"
+            @value-changed="${this._handleChanged}"
+          ></paper-input>
         </div>
-      </ha-card>
-    `;
-  }
-}
-customElements.define("solaire-card", SolaireCard);
+      `;
+    }
 
-// --- ENREGISTREMENT DANS LE SÉLECTEUR DE CARTES ---
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "solaire-card",
-  name: "Solaire Card",
-  preview: true,
-  description: "Carte Solaire avec Editeur Visuel",
-});
+    _handleChanged(ev) {
+      const target = ev.target;
+      const value = ev.detail ? ev.detail.value : target.value;
+      const newConfig = { ...this._config, [target.configValue]: value };
+      const event = new CustomEvent("config-changed", { detail: { config: newConfig }, bubbles: true, composed: true });
+      this.dispatchEvent(event);
+    }
+  }
+  customElements.define("solaire-card-editor", SolaireCardEditor);
+
+  // --- LA CARTE ---
+  class SolaireCard extends LitElement {
+    static get properties() { return { hass: {}, config: {} }; }
+    static getConfigElement() { return document.createElement("solaire-card-editor"); }
+    static getStubConfig() { return { sensor_pv1: "", background_image: "/local/post.png" }; }
+    
+    setConfig(config) { this.config = config; }
+    
+    render() {
+      const state = this.hass.states[this.config.sensor_pv1]?.state || "---";
+      return html`
+        <ha-card style="background-image: url('${this.config.background_image}'); background-size: cover; height: 150px; border: 2px solid #00ffff;">
+          <div style="background: rgba(0,0,0,0.6); height: 100%; display: flex; align-items: center; justify-content: center; color: #00ffff; font-size: 25px; font-weight: bold;">
+            ${state} W
+          </div>
+        </ha-card>
+      `;
+    }
+  }
+  customElements.define("solaire-card", SolaireCard);
+
+  // Enregistrement manuel
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: "solaire-card",
+    name: "Solaire Card",
+    preview: true,
+    description: "Version avec éditeur visuel forcé"
+  });
+  
+  console.info("%c SOLAIRE CARD %c VERSION 1.1.0 CHARGÉE ", "color: white; background: #00ffff; font-weight: bold;", "color: #00ffff; background: #2c3e50; font-weight: bold;");
+})();
