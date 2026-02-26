@@ -1,7 +1,6 @@
 {
-  "name": "Solaire",
-  "render_readme": true,
-  "type": "template",
-  "country": "FR",
-  "description": "Dashboard énergétique avec flux personnalisés et monitoring batterie."
+  "name": "Solaire Card",
+  "type": "plugin",
+  "filename": "solaire-card.js",
+  "render_readme": true
 }
