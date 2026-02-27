@@ -59,7 +59,6 @@
       const s = this.hass.states[c.w_ent];
       const stateFr = WEATHER_TRAD[s.state] || s.state;
       const glowColor = s.state === 'sunny' ? '#ffeb3b' : (s.state.includes('rain') ? '#00bfff' : '#ffffff');
-
       return html`
         <div class="item ${c.w_box?'box':''}" style="left:${c.w_x||10}px; top:${c.w_y||10}px; border:none; background:none; display:block;">
           <ha-state-icon .hass=${this.hass} .stateObj=${s} 
@@ -85,13 +84,17 @@
              style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; width:${c[p+'_w_box']||80}px; height:${c[p+'_h_box']||90}px; transform:rotate(${c[p+'_rot']||0}deg);"
              @click="${() => { const e = new CustomEvent('hass-action', { detail: { config: { entity: c[p+'_ent'] }, action: 'more-info' }, bubbles: true, composed: true }); this.dispatchEvent(e); }}">
           ${active && animType === 'spin' && c[p+'_box'] ? html`<div class="dot-follower"></div>` : ''}
-          <div style="display:flex; align-items:center; gap:5px; transform:rotate(${c[p+'_img_rot']||0}deg);">
+          
+          <div style="display:flex; align-items:center; gap:8px;">
             ${p.startsWith('b') ? html`<div class="gauge-v"><div style="height:${val}%; background:${val>50?'#4caf50':(val>20?'#ff9800':'#f44336')};"></div></div>` : ''}
-            ${c[p+'_img'] ? html`<img src="${c[p+'_img']}" style="width:${c[p+'_img_w']||40}px;">` : ''}
+            
+            <div style="display:flex; flex-direction:column; align-items:center;">
+               ${c[p+'_img'] ? html`<img src="${c[p+'_img']}" style="width:${c[p+'_img_w']||40}px; transform:rotate(${c[p+'_img_rot']||0}deg); margin-bottom:4px;">` : ''}
+               <div class="label" style="color:${c[p+'_tc']||'#eee'}; font-size:${c[p+'_fs_l']||0.65}em;">${c[p+'_name']||''}</div>
+               <div class="val" style="color:${c[p+'_vc']||'#fff'}; font-size:${c[p+'_fs_v']||1}em;">${val.toFixed(0)}${c[p+'_u']||'W'}</div>
+               ${s2 ? html`<div style="color:${c[p+'_v2c']||'#0f0'}; font-size:0.65em; font-weight:bold;">${s2.state}${c[p+'_u2']||''}</div>` : ''}
+            </div>
           </div>
-          <div class="label" style="color:${c[p+'_tc']||'#eee'}; font-size:${c[p+'_fs_l']||0.65}em;">${c[p+'_name']||''}</div>
-          <div class="val" style="color:${c[p+'_vc']||'#fff'}; font-size:${c[p+'_fs_v']||1}em;">${val.toFixed(0)}${c[p+'_u']||'W'}</div>
-          ${s2 ? html`<div style="color:${c[p+'_v2c']||'#0f0'}; font-size:0.65em; font-weight:bold;">${s2.state}${c[p+'_u2']||''}</div>` : ''}
         </div>`;
     }
 
@@ -99,9 +102,9 @@
       .item{position:absolute; display:flex; flex-direction:column; align-items:center; text-shadow: 1px 1px 3px #000; cursor:pointer; border-radius:12px; justify-content:center;}
       .box{background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(8px);}
       .lumina-text { text-shadow: 0 0 5px rgba(255,255,255,0.4); }
-      .gauge-v{width:6px; height:30px; background:#222; border-radius:3px; display:flex; flex-direction:column-reverse; overflow:hidden; border:1px solid #444;}
-      .label{font-weight:600; text-transform:uppercase; margin-top:2px;}
-      .val{font-weight:900;}
+      .gauge-v{width:8px; height:45px; background:#222; border-radius:3px; display:flex; flex-direction:column-reverse; overflow:hidden; border:1px solid #555; flex-shrink:0;}
+      .label{font-weight:600; text-transform:uppercase; text-align:center;}
+      .val{font-weight:900; text-align:center;}
       .border-prod, .border-fixe { border: 2px solid #4caf50 !important; }
       .border-noprod { border: 2px solid #f44336 !important; }
       .border-blink { border: 2px solid #4caf50 !important; animation: blink 1.5s infinite; }
@@ -130,6 +133,7 @@
 
     _renderTabContent() {
       const c = this._config, t = this._tab;
+      const ents = Object.keys(this.hass.states).sort();
       const pfx = {solar:['s1','s2','s3','s4','s5'], house:['h1','h2','h3','h4','h5'], bat:['b1','b2','b3']}[t];
       if (pfx) return pfx.map(p => html`
         <details style="background:#2b2b2b; margin-bottom:5px; padding:10px; border-radius:5px;">
@@ -137,12 +141,13 @@
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
             Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
             X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"> Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
-            W <input type="number" .value="${c[p+'_w_box']||80}" @input="${e=>this._up(p+'_w_box',e.target.value)}"> H <input type="number" .value="${c[p+'_h_box']||90}" @input="${e=>this._up(p+'_h_box',e.target.value)}">
+            W Box <input type="number" .value="${c[p+'_w_box']||80}" @input="${e=>this._up(p+'_w_box',e.target.value)}"> H Box <input type="number" .value="${c[p+'_h_box']||90}" @input="${e=>this._up(p+'_h_box',e.target.value)}">
             Taille Nom <input type="number" step="0.05" .value="${c[p+'_fs_l']||0.65}" @input="${e=>this._up(p+'_fs_l',e.target.value)}">
             Taille Val <input type="number" step="0.05" .value="${c[p+'_fs_v']||1}" @input="${e=>this._up(p+'_fs_v',e.target.value)}">
             Rotation <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
             Entité 1 <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
             Entité 2 <input list="ha-entities" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
+            Unité 2 <input type="text" .value="${c[p+'_u2']||'%'}" @input="${e=>this._up(p+'_u2',e.target.value)}">
             Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}">
             Anim <select @change="${e=>this._up(p+'_anim',e.target.value)}">
               <option value="none" ?selected="${c[p+'_anim']==='none'}">Fixe</option>
@@ -179,5 +184,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card Ultimate V52" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Card Ultimate V53" });
 })();
