@@ -78,7 +78,6 @@
       const active = val > (c[p+'_th'] || 5);
       const animType = c[p+'_anim'] || 'none';
       
-      // Couleurs et Halo personnalisés
       const bgColor = c[p+'_bg'] || 'rgba(0,0,0,0.5)';
       const borderColor = c[p+'_bc'] || 'rgba(255,255,255,0.15)';
       const glowEffect = c[p+'_glow'] ? `box-shadow: 0 0 ${c[p+'_glow_s']||10}px ${c[p+'_glow_c']||'#4caf50'};` : '';
@@ -90,7 +89,6 @@
              @click="${() => { const e = new CustomEvent('hass-action', { detail: { config: { entity: c[p+'_ent'] }, action: 'more-info' }, bubbles: true, composed: true }); this.dispatchEvent(e); }}">
           
           ${active && animType === 'spin' && c[p+'_box'] ? html`<div class="dot-follower"></div>` : ''}
-          
           ${p.startsWith('b') ? html`<div class="gauge-v" style="margin-right:8px;"><div style="height:${val}%; background:${val>50?'#4caf50':(val>20?'#ff9800':'#f44336')};"></div></div>` : ''}
           
           <div style="display:flex; flex-direction:column; align-items:center; flex-grow:1;">
@@ -140,13 +138,18 @@
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
             Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
             X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"> Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
+            W Box <input type="number" .value="${c[p+'_w_box']||80}" @input="${e=>this._up(p+'_w_box',e.target.value)}"> H Box <input type="number" .value="${c[p+'_h_box']||90}" @input="${e=>this._up(p+'_h_box',e.target.value)}">
             
+            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Inclinaison</span>
+            Rot. Bloc <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
+            Rot. Image <input type="number" .value="${c[p+'_img_rot']||0}" @input="${e=>this._up(p+'_img_rot',e.target.value)}">
+
             <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Styles de Textes</span>
             T. Nom <input type="number" step="0.05" .value="${c[p+'_fs_l']||0.65}" @input="${e=>this._up(p+'_fs_l',e.target.value)}">
             T. Val <input type="number" step="0.05" .value="${c[p+'_fs_v']||1}" @input="${e=>this._up(p+'_fs_v',e.target.value)}">
             T. Val 2 <input type="number" step="0.05" .value="${c[p+'_fs_v2']||0.65}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}">
             
-            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Couleurs & Box</span>
+            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Couleurs & Halo</span>
             Fond <input type="text" placeholder="rgba(0,0,0,0.5)" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}">
             Bordure <input type="text" placeholder="rgba(255,255,255,0.15)" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}">
             Halo <input type="checkbox" .checked="${c[p+'_glow']}" @change="${e=>this._up(p+'_glow',e.target.checked)}">
@@ -155,23 +158,28 @@
             Entité 1 <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
             Entité 2 <input list="ha-entities" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
             Img URL <input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
+            Img Size <input type="number" .value="${c[p+'_img_w']||40}" @input="${e=>this._up(p+'_img_w',e.target.value)}">
+            Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}">
           </div>
         </details>`);
       if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         Entité <input list="ha-entities" style="grid-column:span 2" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}">
         X Texte <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y Texte <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
         X Icône <input type="number" .value="${c.w_img_x||0}" @input="${e=>this._up('w_img_x',e.target.value)}"> Y Icône <input type="number" .value="${c.w_img_y||-50}" @input="${e=>this._up('w_img_y',e.target.value)}">
+        Taille Icône <input type="number" .value="${c.w_is||50}" @input="${e=>this._up('w_is',e.target.value)}"> Taille Texte <input type="number" step="0.1" .value="${c.w_fs||0.9}" @input="${e=>this._up('w_fs',e.target.value)}">
       </div>`;
       if (t === 'flow') return html`<div style="background:#2b2b2b; padding:10px;">${[1,2,3,4,5,6,7,8,9,10].map(i => html`
         <details style="margin-bottom:5px;"><summary>Flux ${i}</summary>
           Path <input type="text" style="width:100%" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}">
           Sensor <input list="ha-entities" .value="${c['f'+i+'_s']||''}" @input="${e=>this._up('f'+i+'_s',e.target.value)}">
           Couleur <input type="color" .value="${c['f'+i+'_c']||'#ffff00'}" @change="${e=>this._up('f'+i+'_c',e.target.value)}">
+          Largeur <input type="number" .value="${c['f'+i+'_w']||3}" @input="${e=>this._up('f'+i+'_w',e.target.value)}">
         </details>`)}</div>`;
       if (t === 'gen') return html`<div style="padding:10px; background:#2b2b2b; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         Fond URL <input type="text" style="grid-column:span 2" .value="${c.background_image}" @input="${e=>this._up('background_image',e.target.value)}">
         Card W <input type="number" .value="${c.card_width||500}" @input="${e=>this._up('card_width',e.target.value)}"> 
         Card H <input type="number" .value="${c.card_height||400}" @input="${e=>this._up('card_height',e.target.value)}">
+        Vitesse Flux <input type="number" .value="${c.flow_speed||3}" @input="${e=>this._up('flow_speed',e.target.value)}">
       </div>`;
     }
   }
@@ -179,5 +187,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card Battery Master V55" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Card Master V56" });
 })();
