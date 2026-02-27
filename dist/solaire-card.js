@@ -51,10 +51,11 @@
     _renderWeather() {
       const c = this.config; if(!c.w_ent || !this.hass.states[c.w_ent]) return '';
       const s = this.hass.states[c.w_ent];
+      const stateLabel = s.state.replace(/_/g, ' ').toUpperCase();
       return html`
-        <div class="item box" style="left:${c.w_x||10}px; top:${c.w_y||10}px; padding:5px; flex-direction:row; gap:5px;">
-          <ha-state-icon .hass=${this.hass} .stateObj=${s}></ha-state-icon>
-          <span class="val">${s.attributes.temperature}°C</span>
+        <div class="item ${c.w_box?'box':''}" style="left:${c.w_x||10}px; top:${c.w_y||10}px; padding:8px;">
+          <ha-state-icon .hass=${this.hass} .stateObj=${s} style="--mdc-icon-size:40px; color:#ffeb3b;"></ha-state-icon>
+          <div class="label" style="font-size:0.8em; margin-top:4px;">${stateLabel}</div>
         </div>`;
     }
 
@@ -69,11 +70,11 @@
       const borderClass = active ? (animType === 'spin' ? 'border-prod' : (animType === 'blink' ? 'border-blink' : 'border-fixe')) : 'border-noprod';
 
       return html`
-        <div class="item ${c[p+'_box']?'box':''} ${borderClass}" 
+        <div class="item ${c[p+'_box']?'box':''} ${c[p+'_box'] ? borderClass : ''}" 
              style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; width:${c[p+'_w_box']||80}px; height:${c[p+'_h_box']||90}px; transform:rotate(${c[p+'_rot']||0}deg);" 
              @click="${() => { const e = new CustomEvent('hass-action', { detail: { config: { entity: c[p+'_ent'] }, action: 'more-info' }, bubbles: true, composed: true }); this.dispatchEvent(e); }}">
           
-          ${active && animType === 'spin' ? html`<div class="dot-follower"></div>` : ''}
+          ${active && animType === 'spin' && c[p+'_box'] ? html`<div class="dot-follower"></div>` : ''}
 
           <div style="display:flex; align-items:center; gap:5px;">
             ${p.startsWith('b') ? html`<div class="gauge-v"><div style="height:${val}%; background:${val>50?'#4caf50':(val>20?'#ff9800':'#f44336')};"></div></div>` : ''}
@@ -107,6 +108,7 @@
       }
       @keyframes orbit { from { offset-distance: 0%; } to { offset-distance: 100%; } }
       @keyframes blink { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+      ha-state-icon { transition: transform 2s; }
     `; }
   }
 
@@ -145,16 +147,15 @@
               <option value="spin" ?selected="${c[p+'_anim']==='spin'}">Bille</option>
             </select>
             Entité 1 <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
-            Entité 2 <input list="ha-entities" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
-            Rotation <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
-            Img URL <input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
             Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}">
+            Img URL <input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
           </div>
         </details>`);
-      if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px;">
-        Entité <input list="ha-entities" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}"><br>
+      if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px; border-radius:5px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        Entité <input list="ha-entities" style="grid-column:span 2" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}">
         X <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> 
         Y <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
+        Cadre <input type="checkbox" .checked="${c.w_box}" @change="${e=>this._up('w_box',e.target.checked)}">
       </div>`;
       if (t === 'flow') return html`<div style="background:#2b2b2b; padding:10px;">${[1,2,3,4,5].map(i => html`Flux ${i} <input type="text" style="width:100%" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}"><br>`)}</div>`;
       if (t === 'gen') return html`<div style="padding:10px; background:#2b2b2b;">Fond URL <input type="text" style="width:100%" .value="${c.background_image}" @input="${e=>this._up('background_image',e.target.value)}"></div>`;
@@ -165,5 +166,5 @@
   customElements.define("solaire-card", SolaireCard);
   
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card Total V45", description: "Contrôle total cadres et bille." });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Card Visual V46", description: "Météo texte, icônes animées et cadres optionnels." });
 })();
