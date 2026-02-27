@@ -57,16 +57,18 @@
     _renderWeather() {
       const c = this.config; if(!c.w_ent || !this.hass.states[c.w_ent]) return '';
       const s = this.hass.states[c.w_ent];
+      const temp = c.w_temp_ent && this.hass.states[c.w_temp_ent] ? this.hass.states[c.w_temp_ent].state : null;
       const stateFr = WEATHER_TRAD[s.state] || s.state;
       const glowColor = s.state === 'sunny' ? '#ffeb3b' : (s.state.includes('rain') ? '#00bfff' : '#ffffff');
       return html`
-        <div class="item" style="left:${c.w_x||10}px; top:${c.w_y||10}px; border:none; background:none;">
+        <div class="item" style="left:${c.w_x||10}px; top:${c.w_y||10}px; border:none; background:none; display:flex; flex-direction:column; align-items:center;">
           <ha-state-icon .hass=${this.hass} .stateObj=${s} 
             style="position:absolute; left:${c.w_img_x||0}px; top:${c.w_img_y||-50}px; --mdc-icon-size:${c.w_is||50}px; color:${glowColor}; filter: drop-shadow(0 0 10px ${glowColor});">
           </ha-state-icon>
           <div class="lumina-text" style="font-size:${c.w_fs||0.9}em; color:#fff; font-weight:300; letter-spacing:1px; white-space:nowrap;">
             ${stateFr.toUpperCase()}
           </div>
+          ${temp ? html`<div style="font-size:${c.w_temp_fs||1.2}em; color:${c.w_temp_c||'#fff'}; font-weight:bold; margin-top:2px;">${temp}°C</div>` : ''}
         </div>`;
     }
 
@@ -149,24 +151,16 @@
             X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"> Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
             W Box <input type="number" .value="${c[p+'_w_box']||80}" @input="${e=>this._up(p+'_w_box',e.target.value)}"> H Box <input type="number" .value="${c[p+'_h_box']||90}" @input="${e=>this._up(p+'_h_box',e.target.value)}">
             Radius <input type="number" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}">
-            
-            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Inclinaison</span>
             Rot. Bloc <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
             Rot. Image <input type="number" .value="${c[p+'_img_rot']||0}" @input="${e=>this._up(p+'_img_rot',e.target.value)}">
-
-            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Styles de Textes</span>
             T. Nom <input type="number" step="0.05" .value="${c[p+'_fs_l']||0.65}" @input="${e=>this._up(p+'_fs_l',e.target.value)}">
             T. Val <input type="number" step="0.05" .value="${c[p+'_fs_v']||1}" @input="${e=>this._up(p+'_fs_v',e.target.value)}">
             T. Val 2 <input type="number" step="0.05" .value="${c[p+'_fs_v2']||0.65}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}">
-            
-            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Couleurs & Halo</span>
             Fond <input type="text" placeholder="transparent" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}">
             Bordure <input type="text" placeholder="transparent" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}">
             Halo <input type="checkbox" .checked="${c[p+'_glow']}" @change="${e=>this._up(p+'_glow',e.target.checked)}">
             C. Halo <input type="color" .value="${c[p+'_glow_c']||'#4caf50'}" @change="${e=>this._up(p+'_glow_c',e.target.value)}">
             Size Halo <input type="number" .value="${c[p+'_glow_s']||10}" @input="${e=>this._up(p+'_glow_s',e.target.value)}">
-            
-            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Entités & Images</span>
             Entité 1 <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
             Entité 2 <input list="ha-entities" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
             Img URL <input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
@@ -176,10 +170,12 @@
         </details>`);
       
       if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        Entité <input list="ha-entities" style="grid-column:span 2" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}">
-        X Texte <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y Texte <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
+        Entité Météo <input list="ha-entities" style="grid-column:span 2" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}">
+        Entité Temp <input list="ha-entities" style="grid-column:span 2" .value="${c.w_temp_ent||''}" @input="${e=>this._up('w_temp_ent',e.target.value)}">
+        X Météo <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y Météo <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
         X Icône <input type="number" .value="${c.w_img_x||0}" @input="${e=>this._up('w_img_x',e.target.value)}"> Y Icône <input type="number" .value="${c.w_img_y||-50}" @input="${e=>this._up('w_img_y',e.target.value)}">
         Img Size <input type="number" .value="${c.w_is||50}" @input="${e=>this._up('w_is',e.target.value)}"> Text Size <input type="number" step="0.1" .value="${c.w_fs||0.9}" @input="${e=>this._up('w_fs',e.target.value)}">
+        Temp Size <input type="number" step="0.1" .value="${c.w_temp_fs||1.2}" @input="${e=>this._up('w_temp_fs',e.target.value)}"> Temp Color <input type="color" .value="${c.w_temp_c||'#ffffff'}" @change="${e=>this._up('w_temp_c',e.target.value)}">
       </div>`;
       if (t === 'flow') return html`<div style="background:#2b2b2b; padding:10px;">${[1,2,3,4,5,6,7,8,9,10].map(i => html`
         <details style="margin-bottom:5px;"><summary>Flux ${i}</summary>
@@ -200,5 +196,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card Total Master V61" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Card Weather Plus V62" });
 })();
