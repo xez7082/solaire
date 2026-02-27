@@ -78,10 +78,13 @@
       const active = val > (c[p+'_th'] || 5);
       const animType = c[p+'_anim'] || 'none';
       
-      // LOGIQUE DE TRANSPARENCE : Si vide, alors 'transparent'. Sinon, utilise la couleur saisie.
       const bgColor = c[p+'_bg'] ? c[p+'_bg'] : (c[p+'_box'] ? 'rgba(0,0,0,0.5)' : 'transparent');
       const borderColor = c[p+'_bc'] ? c[p+'_bc'] : (c[p+'_box'] ? 'rgba(255,255,255,0.15)' : 'transparent');
       const glowEffect = c[p+'_glow'] ? `box-shadow: 0 0 ${c[p+'_glow_s']||10}px ${c[p+'_glow_c']||'#4caf50'};` : '';
+
+      // Logique spécifique Batterie (Couleurs et Alerte 15%)
+      let batteryColor = val > 50 ? '#4caf50' : (val > 15 ? '#ff9800' : '#f44336');
+      let batteryClass = (p.startsWith('b') && val <= 15) ? 'gauge-alert' : '';
 
       return html`
         <div class="item" 
@@ -90,7 +93,11 @@
                     background: ${bgColor}; border: 1px solid ${borderColor}; ${glowEffect} border-radius: ${c[p+'_br']||12}px;">
           
           ${active && animType === 'spin' && c[p+'_box'] ? html`<div class="dot-follower" style="offset-path: rect(0% 100% 100% 0% round ${c[p+'_br']||12}px);"></div>` : ''}
-          ${p.startsWith('b') ? html`<div class="gauge-v" style="margin-right:8px;"><div style="height:${val}%; background:${val>50?'#4caf50':(val>20?'#ff9800':'#f44336')};"></div></div>` : ''}
+          
+          ${p.startsWith('b') ? html`
+            <div class="gauge-frame ${batteryClass}" style="margin-right:8px; border-color: ${batteryColor};">
+              <div style="height:${val}%; background:${batteryColor}; width:100%; border-radius:2px;"></div>
+            </div>` : ''}
           
           <div style="display:flex; flex-direction:column; align-items:center; flex-grow:1;">
              ${c[p+'_img'] ? html`<img src="${c[p+'_img']}" style="width:${c[p+'_img_w']||40}px; transform:rotate(${c[p+'_img_rot']||0}deg);">` : ''}
@@ -104,11 +111,16 @@
     static get styles() { return css`
       .item{position:absolute; display:flex; align-items:center; text-shadow: 1px 1px 3px #000; cursor:pointer; justify-content:center; box-sizing: border-box; transition: all 0.3s;}
       .lumina-text { text-shadow: 0 0 5px rgba(255,255,255,0.4); }
-      .gauge-v{width:8px; height:80%; background:#222; border-radius:3px; display:flex; flex-direction:column-reverse; overflow:hidden; border:1px solid #555; flex-shrink:0;}
+      
+      /* NOUVEAU STYLE : CADRE DE JAUGE TRANSPARENT MAIS AVEC BORDURE */
+      .gauge-frame{width:10px; height:80%; background:transparent; display:flex; flex-direction:column-reverse; flex-shrink:0; border: 1px solid transparent; border-radius: 4px; padding: 1px; box-sizing: border-box; transition: border-color 0.3s;}
+      
+      .gauge-alert { animation: blink-border-red 1s infinite; }
       .label{font-weight:600; text-transform:uppercase; text-align:center;}
       .val{font-weight:900; text-align:center;}
       .dot-follower { position: absolute; width: 6px; height: 6px; background: #fff; border-radius: 50%; animation: orbit 3s linear infinite; }
       @keyframes orbit { from { offset-distance: 0%; } to { offset-distance: 100%; } }
+      @keyframes blink-border-red { 0%, 100% { border-color: #f44336; opacity: 1; } 50% { border-color: transparent; opacity: 0.5; } }
     `; }
   }
 
@@ -137,39 +149,27 @@
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
             Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
             X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"> Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
-            W Box <input type="number" .value="${c[p+'_w_box']||80}" @input="${e=>this._up(p+'_w_box',e.target.value)}"> H Box <input type="number" .value="${c[p+'_h_box']||90}" @input="${e=>this._up(p+'_h_box',e.target.value)}">
             Radius <input type="number" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}">
-            
-            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Inclinaison</span>
             Rot. Bloc <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
-            Rot. Image <input type="number" .value="${c[p+'_img_rot']||0}" @input="${e=>this._up(p+'_img_rot',e.target.value)}">
-
-            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Couleurs & Halo</span>
             Fond <input type="text" placeholder="transparent" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}">
             Bordure <input type="text" placeholder="transparent" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}">
             Halo <input type="checkbox" .checked="${c[p+'_glow']}" @change="${e=>this._up(p+'_glow',e.target.checked)}">
-            Taille Halo <input type="number" .value="${c[p+'_glow_s']||10}" @input="${e=>this._up('glow_s',e.target.value)}">
-            
             Entité 1 <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
             Entité 2 <input list="ha-entities" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
-            Img URL <input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
             Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}">
           </div>
           <datalist id="ha-entities">${ents.map(e => html`<option value="${e}">`)}</datalist>
         </details>`);
-      // ... Reste de l'éditeur (Weather, Flow, Gen) inchangé
+      
       if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         Entité <input list="ha-entities" style="grid-column:span 2" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}">
         X Texte <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y Texte <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
-        X Icône <input type="number" .value="${c.w_img_x||0}" @input="${e=>this._up('w_img_x',e.target.value)}"> Y Icône <input type="number" .value="${c.w_img_y||-50}" @input="${e=>this._up('w_img_y',e.target.value)}">
-        Taille Icône <input type="number" .value="${c.w_is||50}" @input="${e=>this._up('w_is',e.target.value)}"> Taille Texte <input type="number" step="0.1" .value="${c.w_fs||0.9}" @input="${e=>this._up('w_fs',e.target.value)}">
       </div>`;
       if (t === 'flow') return html`<div style="background:#2b2b2b; padding:10px;">${[1,2,3,4,5,6,7,8,9,10].map(i => html`
         <details style="margin-bottom:5px;"><summary>Flux ${i}</summary>
           Path <input type="text" style="width:100%" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}">
           Sensor <input list="ha-entities" .value="${c['f'+i+'_s']||''}" @input="${e=>this._up('f'+i+'_s',e.target.value)}">
           Couleur <input type="color" .value="${c['f'+i+'_c']||'#ffff00'}" @change="${e=>this._up('f'+i+'_c',e.target.value)}">
-          Largeur <input type="number" .value="${c['f'+i+'_w']||3}" @input="${e=>this._up('f'+i+'_w',e.target.value)}">
         </details>`)}</div>`;
       if (t === 'gen') return html`<div style="padding:10px; background:#2b2b2b; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         Fond URL <input type="text" style="grid-column:span 2" .value="${c.background_image}" @input="${e=>this._up('background_image',e.target.value)}">
@@ -182,5 +182,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card Clear View V57" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Card Battery Master V59" });
 })();
