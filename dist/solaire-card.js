@@ -48,7 +48,7 @@
           <img src="${c.background_image}" style="position:absolute; width:100%; height:100%; object-fit:cover; z-index:1;">
           <canvas id="flowCanvas" width="${c.card_width||500}" height="${c.card_height||400}" style="position:absolute; z-index:5; pointer-events:none;"></canvas>
           <div style="position:absolute; width:100%; height:100%; z-index:10;">
-            ${['s1','s2','s3','s4','s5','h1','h2','h3','h4','h5','b1','b2','b3'].map(p => this._renderItem(p))}
+            ${['s1','s2','s3','s4','s5', 'h1','h2', 'h3','h4','h5', 'b1','b2','b3'].map(p => this._renderItem(p))}
             ${this._renderWeather()}
           </div>
         </ha-card>`;
@@ -58,10 +58,16 @@
       const c = this.config; if(!c.w_ent || !this.hass.states[c.w_ent]) return '';
       const s = this.hass.states[c.w_ent];
       const stateFr = WEATHER_TRAD[s.state] || s.state;
+      const glowColor = s.state === 'sunny' ? '#ffeb3b' : (s.state.includes('rain') ? '#00bfff' : '#ffffff');
+
       return html`
-        <div class="item ${c.w_box?'box':''}" style="left:${c.w_x||10}px; top:${c.w_y||10}px; padding:8px;">
-          <ha-state-icon .hass=${this.hass} .stateObj=${s} style="--mdc-icon-size:${c.w_is||40}px; color:#ffeb3b;"></ha-state-icon>
-          <div class="label" style="font-size:${c.w_fs||0.8}em; margin-top:4px;">${stateFr.toUpperCase()}</div>
+        <div class="item ${c.w_box?'box':''}" style="left:${c.w_x||10}px; top:${c.w_y||10}px; padding:10px; border:none; background:none;">
+          <ha-state-icon .hass=${this.hass} .stateObj=${s} 
+            style="--mdc-icon-size:${c.w_is||50}px; color:${glowColor}; filter: drop-shadow(0 0 8px ${glowColor});">
+          </ha-state-icon>
+          <div class="lumina-text" style="font-size:${c.w_fs||0.9}em; margin-top:5px; color:#fff; font-weight:300; letter-spacing:1px;">
+            ${stateFr.toUpperCase()}
+          </div>
         </div>`;
     }
 
@@ -90,10 +96,11 @@
     }
 
     static get styles() { return css`
-      .item{position:absolute; display:flex; flex-direction:column; align-items:center; text-shadow: 1px 1px 2px #000; cursor:pointer; border-radius:10px; transition: all 0.3s; white-space:nowrap; box-sizing: border-box; justify-content: center;}
-      .box{background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(4px);}
-      .gauge-v{width:6px; height:30px; background:#333; border-radius:2px; display:flex; flex-direction:column-reverse; overflow:hidden; border:1px solid #555;}
-      .label{font-weight:bold; text-transform:uppercase; margin-top:2px;}
+      .item{position:absolute; display:flex; flex-direction:column; align-items:center; text-shadow: 1px 1px 3px #000; cursor:pointer; border-radius:12px; transition: all 0.3s; white-space:nowrap; box-sizing: border-box; justify-content: center;}
+      .box{background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(8px);}
+      .lumina-text { text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+      .gauge-v{width:6px; height:30px; background:#222; border-radius:3px; display:flex; flex-direction:column-reverse; overflow:hidden; border:1px solid #444;}
+      .label{font-weight:600; text-transform:uppercase; margin-top:2px;}
       .val{font-weight:900;}
       .border-noprod { border: 2px solid #f44336 !important; }
       .border-fixe { border: 2px solid #4caf50 !important; }
@@ -101,12 +108,12 @@
       .border-prod { border: 2px solid #4caf50 !important; }
       .dot-follower {
         position: absolute; width: 8px; height: 8px; background: #fff; border-radius: 50%;
-        box-shadow: 0 0 8px #fff, 0 0 12px #4caf50;
-        offset-path: rect(0% 100% 100% 0% round 10px);
+        box-shadow: 0 0 10px #fff, 0 0 15px #4caf50;
+        offset-path: rect(0% 100% 100% 0% round 12px);
         animation: orbit 3s linear infinite; z-index: 100;
       }
       @keyframes orbit { from { offset-distance: 0%; } to { offset-distance: 100%; } }
-      @keyframes blink { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+      @keyframes blink { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
     `; }
   }
 
@@ -135,20 +142,25 @@
           <summary>📦 ${p.toUpperCase()} : ${c[p+'_name']||''}</summary>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
             Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
-            Taille Nom <input type="number" step="0.05" .value="${c[p+'_fs_l']||0.65}" @input="${e=>this._up(p+'_fs_l',e.target.value)}">
-            Taille Val <input type="number" step="0.05" .value="${c[p+'_fs_v']||1}" @input="${e=>this._up(p+'_fs_v',e.target.value)}">
             X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"> Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
             W <input type="number" .value="${c[p+'_w_box']||80}" @input="${e=>this._up(p+'_w_box',e.target.value)}"> H <input type="number" .value="${c[p+'_h_box']||90}" @input="${e=>this._up(p+'_h_box',e.target.value)}">
+            Taille Nom <input type="number" step="0.05" .value="${c[p+'_fs_l']||0.65}" @input="${e=>this._up(p+'_fs_l',e.target.value)}">
+            Taille Val <input type="number" step="0.05" .value="${c[p+'_fs_v']||1}" @input="${e=>this._up(p+'_fs_v',e.target.value)}">
             Entité <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
+            Anim <select @change="${e=>this._up(p+'_anim',e.target.value)}">
+              <option value="none" ?selected="${c[p+'_anim']==='none'}">Fixe</option>
+              <option value="blink" ?selected="${c[p+'_anim']==='blink'}">Scintiller</option>
+              <option value="spin" ?selected="${c[p+'_anim']==='spin'}">Bille</option>
+            </select>
             Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}">
+            Img URL <input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
           </div>
         </details>`);
       if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         Entité <input list="ha-entities" style="grid-column:span 2" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}">
-        Taille Icône <input type="number" .value="${c.w_is||40}" @input="${e=>this._up('w_is',e.target.value)}">
-        Taille Texte <input type="number" step="0.1" .value="${c.w_fs||0.8}" @input="${e=>this._up('w_fs',e.target.value)}">
+        Taille Icône <input type="number" .value="${c.w_is||50}" @input="${e=>this._up('w_is',e.target.value)}">
+        Taille Texte <input type="number" step="0.1" .value="${c.w_fs||0.9}" @input="${e=>this._up('w_fs',e.target.value)}">
         X <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
-        Cadre <input type="checkbox" .checked="${c.w_box}" @change="${e=>this._up('w_box',e.target.checked)}">
       </div>`;
       if (t === 'flow') return html`<div style="background:#2b2b2b; padding:10px;">${[1,2,3,4,5].map(i => html`Flux ${i} <input type="text" style="width:100%" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}"><br>`)}</div>`;
       if (t === 'gen') return html`<div style="padding:10px; background:#2b2b2b;">Fond URL <input type="text" style="width:100%" .value="${c.background_image}" @input="${e=>this._up('background_image',e.target.value)}"></div>`;
@@ -159,5 +171,5 @@
   customElements.define("solaire-card", SolaireCard);
   
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card V47", description: "Français, Taille texte et Cadres." });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Card Lumina V48", description: "Design Lumina, Météo Glow et réglages textes." });
 })();
