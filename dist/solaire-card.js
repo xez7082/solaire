@@ -60,7 +60,7 @@
       const stateFr = WEATHER_TRAD[s.state] || s.state;
       const glowColor = s.state === 'sunny' ? '#ffeb3b' : (s.state.includes('rain') ? '#00bfff' : '#ffffff');
       return html`
-        <div class="item ${c.w_box?'box':''}" style="left:${c.w_x||10}px; top:${c.w_y||10}px; border:none; background:none;">
+        <div class="item" style="left:${c.w_x||10}px; top:${c.w_y||10}px;">
           <ha-state-icon .hass=${this.hass} .stateObj=${s} 
             style="position:absolute; left:${c.w_img_x||0}px; top:${c.w_img_y||-50}px; --mdc-icon-size:${c.w_is||50}px; color:${glowColor}; filter: drop-shadow(0 0 10px ${glowColor});">
           </ha-state-icon>
@@ -78,17 +78,18 @@
       const active = val > (c[p+'_th'] || 5);
       const animType = c[p+'_anim'] || 'none';
       
-      const bgColor = c[p+'_bg'] || 'rgba(0,0,0,0.5)';
-      const borderColor = c[p+'_bc'] || 'rgba(255,255,255,0.15)';
+      // LOGIQUE DE TRANSPARENCE : Si vide, alors 'transparent'. Sinon, utilise la couleur saisie.
+      const bgColor = c[p+'_bg'] ? c[p+'_bg'] : (c[p+'_box'] ? 'rgba(0,0,0,0.5)' : 'transparent');
+      const borderColor = c[p+'_bc'] ? c[p+'_bc'] : (c[p+'_box'] ? 'rgba(255,255,255,0.15)' : 'transparent');
       const glowEffect = c[p+'_glow'] ? `box-shadow: 0 0 ${c[p+'_glow_s']||10}px ${c[p+'_glow_c']||'#4caf50'};` : '';
 
       return html`
-        <div class="item ${c[p+'_box']?'box':''}" 
-             style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; width:${c[p+'_w_box']||80}px; height:${c[p+'_h_box']||90}px; transform:rotate(${c[p+'_rot']||0}deg); 
-                    flex-direction: row; padding: 5px; background: ${bgColor}; border-color: ${borderColor}; ${glowEffect}"
-             @click="${() => { const e = new CustomEvent('hass-action', { detail: { config: { entity: c[p+'_ent'] }, action: 'more-info' }, bubbles: true, composed: true }); this.dispatchEvent(e); }}">
+        <div class="item" 
+             style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; width:${c[p+'_w_box']||80}px; height:${c[p+'_h_box']||90}px; 
+                    transform:rotate(${c[p+'_rot']||0}deg); flex-direction: row; padding: 5px; 
+                    background: ${bgColor}; border: 1px solid ${borderColor}; ${glowEffect} border-radius: ${c[p+'_br']||12}px;">
           
-          ${active && animType === 'spin' && c[p+'_box'] ? html`<div class="dot-follower"></div>` : ''}
+          ${active && animType === 'spin' && c[p+'_box'] ? html`<div class="dot-follower" style="offset-path: rect(0% 100% 100% 0% round ${c[p+'_br']||12}px);"></div>` : ''}
           ${p.startsWith('b') ? html`<div class="gauge-v" style="margin-right:8px;"><div style="height:${val}%; background:${val>50?'#4caf50':(val>20?'#ff9800':'#f44336')};"></div></div>` : ''}
           
           <div style="display:flex; flex-direction:column; align-items:center; flex-grow:1;">
@@ -101,13 +102,12 @@
     }
 
     static get styles() { return css`
-      .item{position:absolute; display:flex; align-items:center; text-shadow: 1px 1px 3px #000; cursor:pointer; border-radius:12px; justify-content:center; box-sizing: border-box; border: 1px solid transparent; transition: all 0.3s;}
-      .box{backdrop-filter:blur(8px);}
+      .item{position:absolute; display:flex; align-items:center; text-shadow: 1px 1px 3px #000; cursor:pointer; justify-content:center; box-sizing: border-box; transition: all 0.3s;}
       .lumina-text { text-shadow: 0 0 5px rgba(255,255,255,0.4); }
       .gauge-v{width:8px; height:80%; background:#222; border-radius:3px; display:flex; flex-direction:column-reverse; overflow:hidden; border:1px solid #555; flex-shrink:0;}
       .label{font-weight:600; text-transform:uppercase; text-align:center;}
       .val{font-weight:900; text-align:center;}
-      .dot-follower { position: absolute; width: 6px; height: 6px; background: #fff; border-radius: 50%; offset-path: rect(0% 100% 100% 0% round 12px); animation: orbit 3s linear infinite; }
+      .dot-follower { position: absolute; width: 6px; height: 6px; background: #fff; border-radius: 50%; animation: orbit 3s linear infinite; }
       @keyframes orbit { from { offset-distance: 0%; } to { offset-distance: 100%; } }
     `; }
   }
@@ -119,18 +119,17 @@
 
     render() {
       const tabs = [{id:'solar',n:'Solar'},{id:'house',n:'House'},{id:'bat',n:'Bat'},{id:'weather',n:'Météo'},{id:'flow',n:'Flux'},{id:'gen',n:'Gen'}];
-      const ents = Object.keys(this.hass.states).sort();
       return html`<div style="background:#1c1c1c; color:white; padding:10px; font-family:sans-serif;">
         <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;">
           ${tabs.map(t => html`<button @click="${()=>this._tab=t.id}" style="flex:1; padding:8px; font-size:9px; background:${this._tab===t.id?'#4caf50':'#333'}; border:none; border-radius:4px; cursor:pointer; color:white;">${t.n.toUpperCase()}</button>`)}
         </div>
-        <datalist id="ha-entities">${ents.map(e => html`<option value="${e}">`)}</datalist>
         ${this._renderTabContent()}
       </div>`;
     }
 
     _renderTabContent() {
       const c = this._config, t = this._tab;
+      const ents = Object.keys(this.hass.states).sort();
       const pfx = {solar:['s1','s2','s3','s4','s5'], house:['h1','h2','h3','h4','h5'], bat:['b1','b2','b3']}[t];
       if (pfx) return pfx.map(p => html`
         <details style="background:#2b2b2b; margin-bottom:5px; padding:10px; border-radius:5px;">
@@ -139,29 +138,26 @@
             Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
             X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"> Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
             W Box <input type="number" .value="${c[p+'_w_box']||80}" @input="${e=>this._up(p+'_w_box',e.target.value)}"> H Box <input type="number" .value="${c[p+'_h_box']||90}" @input="${e=>this._up(p+'_h_box',e.target.value)}">
+            Radius <input type="number" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}">
             
             <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Inclinaison</span>
             Rot. Bloc <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
             Rot. Image <input type="number" .value="${c[p+'_img_rot']||0}" @input="${e=>this._up(p+'_img_rot',e.target.value)}">
 
-            <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Styles de Textes</span>
-            T. Nom <input type="number" step="0.05" .value="${c[p+'_fs_l']||0.65}" @input="${e=>this._up(p+'_fs_l',e.target.value)}">
-            T. Val <input type="number" step="0.05" .value="${c[p+'_fs_v']||1}" @input="${e=>this._up(p+'_fs_v',e.target.value)}">
-            T. Val 2 <input type="number" step="0.05" .value="${c[p+'_fs_v2']||0.65}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}">
-            
             <span style="grid-column:span 2; color:#4caf50; font-size:0.8em;">Couleurs & Halo</span>
-            Fond <input type="text" placeholder="rgba(0,0,0,0.5)" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}">
-            Bordure <input type="text" placeholder="rgba(255,255,255,0.15)" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}">
+            Fond <input type="text" placeholder="transparent" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}">
+            Bordure <input type="text" placeholder="transparent" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}">
             Halo <input type="checkbox" .checked="${c[p+'_glow']}" @change="${e=>this._up(p+'_glow',e.target.checked)}">
-            Couleur Halo <input type="color" .value="${c[p+'_glow_c']||'#4caf50'}" @change="${e=>this._up(p+'_glow_c',e.target.value)}">
+            Taille Halo <input type="number" .value="${c[p+'_glow_s']||10}" @input="${e=>this._up('glow_s',e.target.value)}">
             
             Entité 1 <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
             Entité 2 <input list="ha-entities" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
             Img URL <input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
-            Img Size <input type="number" .value="${c[p+'_img_w']||40}" @input="${e=>this._up(p+'_img_w',e.target.value)}">
             Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}">
           </div>
+          <datalist id="ha-entities">${ents.map(e => html`<option value="${e}">`)}</datalist>
         </details>`);
+      // ... Reste de l'éditeur (Weather, Flow, Gen) inchangé
       if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         Entité <input list="ha-entities" style="grid-column:span 2" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}">
         X Texte <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y Texte <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
@@ -179,7 +175,6 @@
         Fond URL <input type="text" style="grid-column:span 2" .value="${c.background_image}" @input="${e=>this._up('background_image',e.target.value)}">
         Card W <input type="number" .value="${c.card_width||500}" @input="${e=>this._up('card_width',e.target.value)}"> 
         Card H <input type="number" .value="${c.card_height||400}" @input="${e=>this._up('card_height',e.target.value)}">
-        Vitesse Flux <input type="number" .value="${c.flow_speed||3}" @input="${e=>this._up('flow_speed',e.target.value)}">
       </div>`;
     }
   }
@@ -187,5 +182,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card Master V56" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Card Clear View V57" });
 })();
