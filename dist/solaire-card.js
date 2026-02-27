@@ -3,6 +3,12 @@
   const html = LitElement.prototype.html;
   const css = LitElement.prototype.css;
 
+  const WEATHER_TRAD = {
+    'clear-night': 'Nuit Claire', 'cloudy': 'Nuageux', 'fog': 'Brouillard', 'hail': 'Grêle', 'lightning': 'Orage',
+    'lightning-rainy': 'Orage Pluvieux', 'partlycloudy': 'Peu Nuageux', 'pouring': 'Averses', 'rainy': 'Pluie',
+    'snowy': 'Neige', 'snowy-rainy': 'Pluie Neigeuse', 'sunny': 'Soleil', 'windy': 'Venté', 'windy-variant': 'Grand Vent', 'exceptional': 'Exceptionnel'
+  };
+
   class SolaireCard extends LitElement {
     static get properties() { return { hass: {}, config: {}, _mX: {type: Number}, _mY: {type: Number} }; }
     setConfig(config) { this.config = config; this._offset = 0; }
@@ -51,11 +57,11 @@
     _renderWeather() {
       const c = this.config; if(!c.w_ent || !this.hass.states[c.w_ent]) return '';
       const s = this.hass.states[c.w_ent];
-      const stateLabel = s.state.replace(/_/g, ' ').toUpperCase();
+      const stateFr = WEATHER_TRAD[s.state] || s.state;
       return html`
         <div class="item ${c.w_box?'box':''}" style="left:${c.w_x||10}px; top:${c.w_y||10}px; padding:8px;">
-          <ha-state-icon .hass=${this.hass} .stateObj=${s} style="--mdc-icon-size:40px; color:#ffeb3b;"></ha-state-icon>
-          <div class="label" style="font-size:0.8em; margin-top:4px;">${stateLabel}</div>
+          <ha-state-icon .hass=${this.hass} .stateObj=${s} style="--mdc-icon-size:${c.w_is||40}px; color:#ffeb3b;"></ha-state-icon>
+          <div class="label" style="font-size:${c.w_fs||0.8}em; margin-top:4px;">${stateFr.toUpperCase()}</div>
         </div>`;
     }
 
@@ -64,24 +70,21 @@
       const s1 = this.hass.states[c[p+'_ent']];
       const s2 = c[p+'_ent2'] ? this.hass.states[c[p+'_ent2']] : null;
       const val = parseFloat(s1.state);
-      
       const active = val > 5;
-      const animType = c[p+'_anim'] || 'none'; 
+      const animType = c[p+'_anim'] || 'none';
       const borderClass = active ? (animType === 'spin' ? 'border-prod' : (animType === 'blink' ? 'border-blink' : 'border-fixe')) : 'border-noprod';
 
       return html`
         <div class="item ${c[p+'_box']?'box':''} ${c[p+'_box'] ? borderClass : ''}" 
              style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; width:${c[p+'_w_box']||80}px; height:${c[p+'_h_box']||90}px; transform:rotate(${c[p+'_rot']||0}deg);" 
              @click="${() => { const e = new CustomEvent('hass-action', { detail: { config: { entity: c[p+'_ent'] }, action: 'more-info' }, bubbles: true, composed: true }); this.dispatchEvent(e); }}">
-          
           ${active && animType === 'spin' && c[p+'_box'] ? html`<div class="dot-follower"></div>` : ''}
-
           <div style="display:flex; align-items:center; gap:5px;">
             ${p.startsWith('b') ? html`<div class="gauge-v"><div style="height:${val}%; background:${val>50?'#4caf50':(val>20?'#ff9800':'#f44336')};"></div></div>` : ''}
             ${c[p+'_img'] ? html`<img src="${c[p+'_img']}" style="width:${c[p+'_img_w']||40}px; transform:rotate(${c[p+'_img_rot']||0}deg);">` : ''}
           </div>
-          <div class="label" style="color:${c[p+'_tc']||'#eee'}">${c[p+'_name']||''}</div>
-          <div class="val" style="color:${c[p+'_vc']||'#fff'}">${val.toFixed(0)}${c[p+'_u']||'W'}</div>
+          <div class="label" style="color:${c[p+'_tc']||'#eee'}; font-size:${c[p+'_fs_l']||0.65}em;">${c[p+'_name']||''}</div>
+          <div class="val" style="color:${c[p+'_vc']||'#fff'}; font-size:${c[p+'_fs_v']||1}em;">${val.toFixed(0)}${c[p+'_u']||'W'}</div>
           ${s2 ? html`<div style="color:${c[p+'_v2c']||'#0f0'}; font-size:0.65em; font-weight:bold;">${s2.state}${c[p+'_u2']||''}</div>` : ''}
         </div>`;
     }
@@ -90,25 +93,20 @@
       .item{position:absolute; display:flex; flex-direction:column; align-items:center; text-shadow: 1px 1px 2px #000; cursor:pointer; border-radius:10px; transition: all 0.3s; white-space:nowrap; box-sizing: border-box; justify-content: center;}
       .box{background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(4px);}
       .gauge-v{width:6px; height:30px; background:#333; border-radius:2px; display:flex; flex-direction:column-reverse; overflow:hidden; border:1px solid #555;}
-      .label{font-weight:bold; text-transform:uppercase; font-size:0.65em; margin-top:2px;}
-      .val{font-weight:900; font-size:1em;}
-      
+      .label{font-weight:bold; text-transform:uppercase; margin-top:2px;}
+      .val{font-weight:900;}
       .border-noprod { border: 2px solid #f44336 !important; }
       .border-fixe { border: 2px solid #4caf50 !important; }
       .border-blink { border: 2px solid #4caf50 !important; animation: blink 1.5s infinite; }
       .border-prod { border: 2px solid #4caf50 !important; }
-
       .dot-follower {
-        position: absolute;
-        width: 8px; height: 8px; background: #fff; border-radius: 50%;
+        position: absolute; width: 8px; height: 8px; background: #fff; border-radius: 50%;
         box-shadow: 0 0 8px #fff, 0 0 12px #4caf50;
         offset-path: rect(0% 100% 100% 0% round 10px);
-        animation: orbit 3s linear infinite;
-        z-index: 100;
+        animation: orbit 3s linear infinite; z-index: 100;
       }
       @keyframes orbit { from { offset-distance: 0%; } to { offset-distance: 100%; } }
       @keyframes blink { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
-      ha-state-icon { transition: transform 2s; }
     `; }
   }
 
@@ -137,24 +135,19 @@
           <summary>📦 ${p.toUpperCase()} : ${c[p+'_name']||''}</summary>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
             Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
-            X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}">
-            Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
-            W <input type="number" .value="${c[p+'_w_box']||80}" @input="${e=>this._up(p+'_w_box',e.target.value)}">
-            H <input type="number" .value="${c[p+'_h_box']||90}" @input="${e=>this._up(p+'_h_box',e.target.value)}">
-            Anim <select @change="${e=>this._up(p+'_anim',e.target.value)}">
-              <option value="none" ?selected="${c[p+'_anim']==='none'}">Fixe</option>
-              <option value="blink" ?selected="${c[p+'_anim']==='blink'}">Scintiller</option>
-              <option value="spin" ?selected="${c[p+'_anim']==='spin'}">Bille</option>
-            </select>
-            Entité 1 <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
+            Taille Nom <input type="number" step="0.05" .value="${c[p+'_fs_l']||0.65}" @input="${e=>this._up(p+'_fs_l',e.target.value)}">
+            Taille Val <input type="number" step="0.05" .value="${c[p+'_fs_v']||1}" @input="${e=>this._up(p+'_fs_v',e.target.value)}">
+            X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"> Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
+            W <input type="number" .value="${c[p+'_w_box']||80}" @input="${e=>this._up(p+'_w_box',e.target.value)}"> H <input type="number" .value="${c[p+'_h_box']||90}" @input="${e=>this._up(p+'_h_box',e.target.value)}">
+            Entité <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
             Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}">
-            Img URL <input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
           </div>
         </details>`);
-      if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px; border-radius:5px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         Entité <input list="ha-entities" style="grid-column:span 2" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}">
-        X <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> 
-        Y <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
+        Taille Icône <input type="number" .value="${c.w_is||40}" @input="${e=>this._up('w_is',e.target.value)}">
+        Taille Texte <input type="number" step="0.1" .value="${c.w_fs||0.8}" @input="${e=>this._up('w_fs',e.target.value)}">
+        X <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
         Cadre <input type="checkbox" .checked="${c.w_box}" @change="${e=>this._up('w_box',e.target.checked)}">
       </div>`;
       if (t === 'flow') return html`<div style="background:#2b2b2b; padding:10px;">${[1,2,3,4,5].map(i => html`Flux ${i} <input type="text" style="width:100%" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}"><br>`)}</div>`;
@@ -166,5 +159,5 @@
   customElements.define("solaire-card", SolaireCard);
   
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card Visual V46", description: "Météo texte, icônes animées et cadres optionnels." });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Card V47", description: "Français, Taille texte et Cadres." });
 })();
