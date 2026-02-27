@@ -23,11 +23,6 @@
       const ctx = cv.getContext('2d');
       ctx.clearRect(0, 0, cv.width, cv.height);
       const c = this.config;
-      if (c.show_grid) {
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-        for (let x=0; x<=cv.width; x+=50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,cv.height); ctx.stroke(); }
-        for (let y=0; y<=cv.height; y+=50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(cv.width,y); ctx.stroke(); }
-      }
       for (let i = 1; i <= 10; i++) {
         const pD = c['f'+i+'_p']; if (!pD) continue;
         const s = c['f'+i+'_s'], v = (s && this.hass.states[s]) ? parseFloat(this.hass.states[s].state) : 0;
@@ -45,24 +40,43 @@
         <ha-card style="width:${c.card_width||500}px; height:${c.card_height||400}px; position:relative; overflow:hidden; background:#000;">
           <img src="${c.background_image}" style="position:absolute; width:100%; height:100%; object-fit:cover; z-index:1;">
           <canvas id="flowCanvas" width="${c.card_width||500}" height="${c.card_height||400}" style="position:absolute; z-index:5; pointer-events:none;"></canvas>
-          <div @mousemove="${e => { const r = e.currentTarget.getBoundingClientRect(); this._mX = Math.round(e.clientX - r.left); this._mY = Math.round(e.clientY - r.top); }}" style="position:absolute; width:100%; height:100%; z-index:10;">
-            ${['s1','s2','s3','s4','s5','h1','h2','h3','h4','h5','b1','b2','b3','g1','g2'].map(p => this._renderItem(p))}
+          <div style="position:absolute; width:100%; height:100%; z-index:10;">
+            ${['s1','s2','s3','s4','s5','h1','h2','h3','h4','h5','b1','b2','b3'].map(p => this._renderItem(p))}
+            ${this._renderWeather()}
           </div>
-          ${c.show_grid ? html`<div style="position:absolute; top:5px; left:5px; background:red; color:white; font-size:10px; z-index:30; padding:2px;">X:${this._mX} Y:${this._mY}</div>` : ''}
         </ha-card>`;
+    }
+
+    _renderWeather() {
+      const c = this.config; if(!c.w_ent) return '';
+      const s = this.hass.states[c.w_ent]; if(!s) return '';
+      const state = s.state;
+      const temp = s.attributes.temperature;
+      const hum = s.attributes.humidity;
+      return html`
+        <div class="item box weather-card" style="left:${c.w_x||10}px; top:${c.w_y||10}px;">
+          <ha-state-icon .hass=${this.hass} .stateObj=${s} style="--mdc-icon-size:30px; color:#ff9800;"></ha-state-icon>
+          <div class="val">${temp}°C</div>
+          <div class="label">${state.replace(/_/g, ' ')}</div>
+          <div style="font-size:0.6em; opacity:0.8;">💧 ${hum}%</div>
+        </div>`;
     }
 
     _renderItem(p) {
       const c = this.config; const s1 = this.hass.states[c[p+'_ent']]; if(!s1) return '';
       const s2 = c[p+'_ent2'] ? this.hass.states[c[p+'_ent2']] : null;
       const val = parseFloat(s1.state);
-      const isBat = p.startsWith('b');
-      const gaugeCol = val > 50 ? '#4caf50' : (val > 20 ? '#ff9800' : '#f44336');
+      const isS = p.startsWith('s');
+      const isB = p.startsWith('b');
+      const prodActive = isS && val > 5;
+      const borderClass = prodActive ? (c.s_anim === 'spin' ? 'border-spin' : 'border-blink') : 'border-off';
 
       return html`
-        <div class="item ${c[p+'_box']?'box':''}" style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; transform:rotate(${c[p+'_rot']||0}deg);" @click="${() => { const e = new CustomEvent('hass-action', { detail: { config: { entity: c[p+'_ent'] }, action: 'more-info' }, bubbles: true, composed: true }); this.dispatchEvent(e); }}">
-          <div style="display:flex; align-items:center; gap:8px;">
-            ${isBat ? html`<div class="gauge-v"><div style="height:${val}%; background:${gaugeCol}; transition: height 0.5s;"></div></div>` : ''}
+        <div class="item ${c[p+'_box']?'box':''} ${isS ? borderClass : ''}" 
+             style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; transform:rotate(${c[p+'_rot']||0}deg);" 
+             @click="${() => { const e = new CustomEvent('hass-action', { detail: { config: { entity: c[p+'_ent'] }, action: 'more-info' }, bubbles: true, composed: true }); this.dispatchEvent(e); }}">
+          <div style="display:flex; align-items:center; gap:5px;">
+            ${isB ? html`<div class="gauge-v"><div style="height:${val}%; background:${val>50?'#4caf50':(val>20?'#ff9800':'#f44336')};"></div></div>` : ''}
             ${c[p+'_img'] ? html`<img src="${c[p+'_img']}" style="width:${c[p+'_img_w']||40}px; transform:rotate(${c[p+'_img_rot']||0}deg);">` : ''}
           </div>
           <div class="label" style="color:${c[p+'_tc']||'#eee'}; font-size:${c[p+'_fs_t']||0.7}em;">${c[p+'_name']||''}</div>
@@ -72,11 +86,21 @@
     }
 
     static get styles() { return css`
-      .item{position:absolute; display:flex; flex-direction:column; align-items:center; text-shadow: 1px 1px 2px #000; cursor:pointer; white-space:nowrap;}
-      .box{background:rgba(0,0,0,0.6); padding:8px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(4px);}
-      .gauge-v{width:6px; height:35px; background:#333; border:1px solid #777; border-radius:2px; display:flex; flex-direction:column-reverse; overflow:hidden;}
+      .item{position:absolute; display:flex; flex-direction:column; align-items:center; text-shadow: 1px 1px 2px #000; cursor:pointer; padding:8px; border-radius:10px; transition: all 0.3s;}
+      .box{background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.2); backdrop-filter:blur(4px);}
+      .weather-card{padding:10px; min-width:80px; text-align:center;}
+      .gauge-v{width:6px; height:35px; background:#333; border-radius:2px; display:flex; flex-direction:column-reverse; overflow:hidden; border:1px solid #555;}
       .label{font-weight:bold; text-transform:uppercase; margin-top:2px;}
       .val{font-weight:900;}
+      
+      /* Animations des bordures */
+      .border-off { border: 2px solid #f44336 !important; }
+      .border-blink { border: 2px solid #4caf50 !important; animation: blink 1.5s infinite; }
+      .border-spin { border: 2px solid #4caf50 !important; box-shadow: 0 0 10px #4caf50; }
+      .border-spin::after { content:''; position:absolute; top:-2px; left:-2px; right:-2px; bottom:-2px; border:2px solid #fff; border-radius:10px; clip-path: inset(0 80% 80% 0); animation: rotate 2s linear infinite; }
+      
+      @keyframes blink { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+      @keyframes rotate { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     `; }
   }
 
@@ -87,7 +111,7 @@
 
     render() {
       const ents = Object.keys(this.hass.states).sort();
-      const tabs = [{id:'solar',n:'Solar'},{id:'house',n:'House'},{id:'bat',n:'Bat'},{id:'grid',n:'Grid'},{id:'flow',n:'Flow'},{id:'gen',n:'Gen'}];
+      const tabs = [{id:'solar',n:'Solar'},{id:'house',n:'House'},{id:'bat',n:'Bat'},{id:'weather',n:'Météo'},{id:'flow',n:'Flow'},{id:'gen',n:'Gen'}];
       return html`<div style="background:#1c1c1c; color:white; padding:10px; font-family:sans-serif;">
         <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;">
           ${tabs.map(t => html`<button @click="${()=>this._tab=t.id}" style="flex:1; padding:8px; font-size:9px; background:${this._tab===t.id?'#4caf50':'#333'}; color:white; border:none; border-radius:4px; cursor:pointer;">${t.n.toUpperCase()}</button>`)}
@@ -99,44 +123,31 @@
 
     _renderTabContent() {
       const c = this._config, t = this._tab;
-      const pfx = {solar:['s1','s2','s3','s4','s5'], house:['h1','h2','h3','h4','h5'], bat:['b1','b2','b3'], grid:['g1','g2']}[t];
-      if (pfx) return pfx.map(p => html`
-        <details style="background:#2b2b2b; margin-bottom:5px; padding:10px; border-radius:5px;">
-          <summary>⚙️ ${p.toUpperCase()} : ${c[p+'_name']||'Sans nom'}</summary>
+      const pfx = {solar:['s1','s2','s3','s4','s5'], house:['h1','h2','h3','h4','h5'], bat:['b1','b2','b3']}[t];
+      if (pfx) return html`
+        ${t==='solar'?html`Style Prod: <select @change="${e=>this._up('s_anim',e.target.value)}"><option value="blink" ?selected="${c.s_anim==='blink'}">Scintiller</option><option value="spin" ?selected="${c.s_anim==='spin'}">Tourner</option></select>`:''}
+        ${pfx.map(p => html`
+        <details style="background:#2b2b2b; margin-bottom:5px; padding:10px;">
+          <summary>⚙️ ${p.toUpperCase()} : ${c[p+'_name']||''}</summary>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
             Nom <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
             Cadre <input type="checkbox" .checked="${c[p+'_box']}" @change="${e=>this._up(p+'_box',e.target.checked)}">
             Entité 1 <input list="ha-entities" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
-            Unité 1 <input type="text" .value="${c[p+'_u']||'W'}" @input="${e=>this._up(p+'_u',e.target.value)}">
             Entité 2 <input list="ha-entities" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
-            Unité 2 <input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}">
-            X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}">
-            Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
-            Rot Bloc <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
-            Taille Texte <input type="number" step="0.1" .value="${c[p+'_fs_v']||1.1}" @input="${e=>this._up(p+'_fs_v',e.target.value)}">
-            Image URL <input type="text" style="grid-column:span 2" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
-            Taille Img <input type="number" .value="${c[p+'_img_w']||40}" @input="${e=>this._up(p+'_img_w',e.target.value)}">
-            Rot Img <input type="number" .value="${c[p+'_img_rot']||0}" @input="${e=>this._up(p+'_img_rot',e.target.value)}">
+            X <input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"> Y <input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}">
+            Rotation <input type="number" .value="${c[p+'_rot']||0}" @input="${e=>this._up(p+'_rot',e.target.value)}">
+            Img URL <input type="text" style="grid-column:span 2" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
           </div>
-        </details>
-      `);
-      if (t === 'flow') return html`
-        <div style="background:#2b2b2b; padding:10px; border-radius:5px;">
-          Vitesse <input type="range" min="1" max="10" .value="${c.flow_speed||3}" @change="${e=>this._up('flow_speed',e.target.value)}">
-          Taille Point <input type="number" style="width:50px" .value="${c.dash_size||10}" @input="${e=>this._up('dash_size',e.target.value)}">
-          <hr style="opacity:0.2; margin:10px 0;">
-          ${[1,2,3,4,5,6,7,8,9,10].map(i => html`
-            <details style="margin-bottom:5px;"><summary>Flux ${i}</summary>
-              Tracé SVG <input type="text" style="width:100%" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}">
-              Entité Watts <input list="ha-entities" style="width:100%" .value="${c['f'+i+'_s']||''}" @input="${e=>this._up('f'+i+'_s',e.target.value)}">
-              Couleur <input type="color" .value="${c['f'+i+'_c']||'#ff0'}" @input="${e=>this._up('f'+i+'_c',e.target.value)}">
-            </details>
-          `)}
-        </div>
+        </details>`)}
       `;
+      if (t === 'weather') return html`<div style="background:#2b2b2b; padding:10px;">
+        Entité Météo <input list="ha-entities" .value="${c.w_ent||''}" @input="${e=>this._up('w_ent',e.target.value)}"><br>
+        X <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
+      </div>`;
       if (t === 'gen') return html`<div style="padding:10px; background:#2b2b2b;">
-        Fond URL <input type="text" style="width:100%" .value="${c.background_image}" @input="${e=>this._up('background_image',e.target.value)}"><br>
-        Grille <input type="checkbox" .checked="${c.show_grid}" @change="${e=>this._up('show_grid',e.target.checked)}">
+        Image Fond <input type="text" style="width:100%" .value="${c.background_image}" @input="${e=>this._up('background_image',e.target.value)}"><br>
+        Largeur <input type="number" .value="${c.card_width||500}" @input="${e=>this._up('card_width',e.target.value)}">
+        Hauteur <input type="number" .value="${c.card_height||400}" @input="${e=>this._up('card_height',e.target.value)}">
       </div>`;
     }
   }
