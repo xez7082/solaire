@@ -3,6 +3,13 @@
   const html = LitElement.prototype.html;
   const css = LitElement.prototype.css;
 
+  const METEO_FR = {
+    'clear-night': 'Nuit claire', 'cloudy': 'Nuageux', 'fog': 'Brouillard', 'hail': 'Grêle',
+    'lightning': 'Orages', 'lightning-rain': 'Orages pluvieux', 'partlycloudy': 'Partiellement nuageux',
+    'pouring': 'Averses', 'rainy': 'Pluvieux', 'snowy': 'Neigeux', 'snowy-rainy': 'Pluie et neige',
+    'sunny': 'Ensoleillé', 'windy': 'Venteux', 'windy-variant': 'Venteux', 'exceptional': 'Exceptionnel'
+  };
+
   class SolaireCard extends LitElement {
     static get properties() { return { hass: {}, config: {} }; }
     
@@ -69,10 +76,13 @@
       const s1 = this.hass.states[c[p + '_ent']];
       const s2 = this.hass.states[c[p + '_ent2']];
       
-      // Traduction automatique des états météo si c'est une entité weather
       let val1 = s1 ? s1.state : '0';
-      if (p.startsWith('w') && s1 && s1.attributes && s1.attributes.attribution) {
-          val1 = this.hass.localize(`component.weather.state._.${val1}`) || val1;
+      let iconMeteo = null;
+
+      if (p.startsWith('w') && s1) {
+          const rawState = val1.toLowerCase().replace('-', '');
+          val1 = METEO_FR[rawState] || METEO_FR[val1] || val1;
+          iconMeteo = `hass:weather-${s1.state.replace('partlycloudy', 'partly-cloudy')}`;
       }
       
       const val2 = s2 ? s2.state : null;
@@ -94,12 +104,12 @@
               <div class="battery-gauge"><div style="height:${val2}%; background:${val2 < 20 ? '#f44336' : '#4caf50'};"></div></div>
             ` : ''}
 
-            ${p.startsWith('w') && s1 && s1.state ? html`
-              <ha-icon icon="hass:weather-${s1.state.replace('partlycloudy', 'partly-cloudy')}" style="margin-right:8px; --mdc-icon-size:${c[p+'_img_w'] || 30}px; color:#fff;"></ha-icon>
+            ${iconMeteo ? html`
+              <ha-icon icon="${iconMeteo}" style="margin-right:12px; --mdc-icon-size:${c[p+'_img_w'] || 35}px; color:#fff; flex-shrink:0;"></ha-icon>
             ` : ''}
 
             <div class="content">
-              ${c[p+'_img'] && !p.startsWith('w') ? html`<img src="${c[p+'_img']}" width="${c[p+'_img_w'] || 35}">` : ''}
+              ${c[p+'_img'] && !p.startsWith('w') ? html`<img src="${c[p+'_img']}" width="${c[p+'_img_w'] || 35}" style="margin-bottom:4px;">` : ''}
               <div class="label" style="color:${c[p+'_tc'] || '#aaa'}; font-size:${c[p+'_fs_l'] || 10}px;">${c[p+'_name'] || ''}</div>
               <div class="value" style="color:${c[p+'_vc'] || '#fff'}; font-size:${c[p+'_fs_v'] || 15}px;">${val1}${c[p+'_u'] || ''}</div>
               ${val2 !== null ? html`<div class="value2" style="color:${c[p+'_v2c'] || '#4caf50'}; font-size:${c[p+'_fs_v2'] || 12}px;">${val2}${c[p+'_u2'] || ''}</div>` : ''}
@@ -114,16 +124,17 @@
       #flowCanvas { position: absolute; z-index: 5; pointer-events: none; }
       .layer { position: absolute; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
       .item-box { position: absolute; padding: var(--border-thickness); overflow: hidden; pointer-events: auto; display: flex; box-sizing: border-box; }
-      .inner-card { display: flex; align-items: center; padding: 8px; width: 100%; z-index: 2; backdrop-filter: blur(5px); height: 100%; box-sizing: border-box; }
+      .inner-card { display: flex; align-items: center; justify-content: center; padding: 10px; width: 100%; z-index: 2; backdrop-filter: blur(5px); height: 100%; box-sizing: border-box; }
       .animated-border::before { content: ''; position: absolute; z-index: 1; left: -50%; top: -50%; width: 200%; height: 200%; background-image: conic-gradient(transparent, transparent, transparent, var(--neon-color)); animation: rotate 3s linear infinite; }
       @keyframes rotate { 100% { transform: rotate(1turn); } }
-      .content { flex-grow: 1; text-align: center; overflow: hidden; }
+      .content { flex-grow: 1; text-align: center; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
       .label { font-weight: bold; text-transform: uppercase; white-space: nowrap; }
-      .value { font-weight: 900; line-height: 1.1; }
-      .battery-gauge { width: 8px; height: 100%; min-height: 35px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); margin-right: 6px; display: flex; flex-direction: column-reverse; overflow: hidden; border-radius: 2px; }
+      .value { font-weight: 900; line-height: 1.1; white-space: normal; }
+      .battery-gauge { width: 8px; height: 100%; min-height: 35px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); margin-right: 8px; display: flex; flex-direction: column-reverse; overflow: hidden; border-radius: 2px; flex-shrink: 0; }
     `; }
   }
 
+  // --- EDITOR REMAINS THE SAME AS V200 ---
   class SolaireCardEditor extends LitElement {
     static get properties() { return { _config: {}, _tab: {type: String} }; }
     constructor() { super(); this._tab = 'gen'; }
@@ -164,7 +175,7 @@
           Entité 1 / 2: <div style="display:flex;gap:2px;"><input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}"><input list="e" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}"></div>
           Unités 1 / 2: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_u']||''}" @input="${e=>this._up(p+'_u',e.target.value)}"><input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}"></div>
           Fond / Néon: <div style="display:flex;gap:2px;"><input type="text" placeholder="Fond" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}"><input type="text" placeholder="Néon" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}"></div>
-          Taille Icône: <input type="number" .value="${c[p+'_img_w']||30}" @input="${e=>this._up(p+'_img_w',e.target.value)}">
+          Taille Icône: <input type="number" .value="${c[p+'_img_w']||35}" @input="${e=>this._up(p+'_img_w',e.target.value)}">
         </div></details><datalist id="e">${ents.map(e => html`<option value="${e}">`)}</datalist>`);
     }
   }
@@ -172,5 +183,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire V200 Météo" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire V210 French" });
 })();
