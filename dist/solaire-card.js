@@ -32,20 +32,20 @@
       for (let i = 1; i <= 20; i++) {
         const pD = c[`f${i}_p`], s = c[`f${i}_s`];
         if (!pD || !this.hass.states[s]) continue;
-        const v = parseFloat(this.hass.states[s].state);
+        const v = parseFloat(this.hass.states[s].state) || 0;
         if (Math.abs(v) <= (c.flow_th || 2)) continue;
 
         const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
         tempPath.setAttribute("d", pD);
-        const pathLen = tempPath.getTotalLength();
-        const progress = (this._offset * 25) % pathLen;
-        const pt = tempPath.getPointAtLength(v < 0 ? pathLen - progress : progress);
-
-        ctx.save();
-        const size = parseFloat(c[`f${i}_w`]) || 3;
-        ctx.shadowBlur = size * 4; ctx.shadowColor = c[`f${i}_c`] || '#ff0';
-        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(pt.x, pt.y, size, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
+        try {
+            const pathLen = tempPath.getTotalLength();
+            const progress = (this._offset * 25) % pathLen;
+            const pt = tempPath.getPointAtLength(v < 0 ? pathLen - progress : progress);
+            ctx.save();
+            ctx.shadowBlur = (c[`f${i}_w`]||3)*4; ctx.shadowColor = c[`f${i}_c`] || '#ff0';
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(pt.x, pt.y, c[`f${i}_w`]||3, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        } catch(e) {}
       }
     }
 
@@ -53,7 +53,6 @@
       const c = this.config;
       const keys = [];
       for(let i=1; i<=10; i++) { keys.push(`s${i}`, `h${i}`); if(i<=5) keys.push(`b${i}`); }
-
       return html`
         <ha-card style="width:${c.card_width}px; height:${c.card_height}px;">
           <img src="${c.background_image}" class="bg-img">
@@ -63,24 +62,35 @@
     }
 
     _renderItem(p) {
-      const c = this.config; if (!c[p + '_ent'] || !this.hass.states[c[p + '_ent']]) return '';
+      const c = this.config;
+      // On affiche l'objet si au moins le NOM ou une ENTITÉ est défini
+      if (!c[p + '_ent'] && !c[p + '_name']) return '';
+      
       const s1 = this.hass.states[c[p + '_ent']];
       const s2 = c[p + '_ent2'] && this.hass.states[c[p + '_ent2']] ? this.hass.states[c[p + '_ent2']] : null;
-      const val1 = parseFloat(s1.state) || 0;
-      const val2 = s2 ? parseFloat(s2.state) : null;
+      const val1 = s1 ? parseFloat(s1.state) || 0 : 0;
+      const val2 = s2 ? parseFloat(s2.state) || 0 : null;
       const isActive = Math.abs(val1) > (c.flow_th || 2);
+      
+      const borderCol = c[p+'_bc'] || '#4caf50';
+      const hasBorder = borderCol !== 'none' && borderCol !== 'transparent';
 
       return html`
-        <div class="item-box ${isActive ? 'animated-border' : ''}" style="
+        <div class="item-box ${isActive && hasBorder ? 'animated-border' : ''}" style="
           left:${c[p+'_x']||0}px; top:${c[p+'_y']||0}px; 
           width:${c[p+'_w_box']||120}px; height:${c[p+'_h_box']||'auto'}px;
-          --neon-color:${c[p+'_bc']||'#4caf50'}; --border-thickness:${c[p+'_b_w']||2}px;
+          --neon-color:${borderCol}; 
+          --border-thickness:${hasBorder ? (c[p+'_b_w']||2) : 0}px;
           --anim-speed:${c[p+'_as']||3}s; border-radius:${c[p+'_br']||12}px;
-          box-shadow: ${c[p+'_sh']||'0 8px 16px rgba(0,0,0,0.5)'};
+          box-shadow: ${c[p+'_sh'] || (hasBorder ? '0 8px 16px rgba(0,0,0,0.5)' : 'none')};
         ">
-          <div class="inner-card" style="background:${c[p+'_bg']||'rgba(15,15,15,0.85)'}; border-radius:${c[p+'_br']||12}px;">
-            ${p.startsWith('b') ? html`
-               <div class="battery-gauge"><div style="height:${val2 || 0}%; background:${(val2 || 0) < 20 ? '#f44336' : '#4caf50'}; shadow: 0 0 5px #fff;"></div></div>
+          <div class="inner-card" style="
+            background:${c[p+'_bg'] || 'rgba(15,15,15,0.85)'}; 
+            border-radius:${c[p+'_br']||12}px;
+            border: ${hasBorder ? 'none' : '0px'};
+          ">
+            ${p.startsWith('b') && val2 !== null ? html`
+               <div class="battery-gauge"><div style="height:${val2}%; background:${val2 < 20 ? '#f44336' : '#4caf50'};"></div></div>
             ` : ''}
             <div class="content">
               ${c[p+'_img'] ? html`<img src="${c[p+'_img']}" width="${c[p+'_img_w']||35}">` : ''}
@@ -129,31 +139,30 @@
     _renderTabContent(ents) {
       const c = this._config, t = this._tab;
       if (t === 'gen') return html`<div style="display:grid; gap:10px;">
-        Fond URL: <input type="text" .value="${c.background_image||''}" @input="${e=>this._up('background_image',e.target.value)}">
-        Dimension Carte (W / H): <div style="display:flex;gap:5px;"><input type="number" .value="${c.card_width}" @input="${e=>this._up('card_width',e.target.value)}"><input type="number" .value="${c.card_height}" @input="${e=>this._up('card_height',e.target.value)}"></div>
-        Vitesse Globale Flux: <input type="number" .value="${c.flow_speed}" @input="${e=>this._up('flow_speed',e.target.value)}" step="0.1">
+        Image Fond: <input type="text" .value="${c.background_image||''}" @input="${e=>this._up('background_image',e.target.value)}">
+        W/H Carte: <div style="display:flex;gap:5px;"><input type="number" .value="${c.card_width}" @input="${e=>this._up('card_width',e.target.value)}"><input type="number" .value="${c.card_height}" @input="${e=>this._up('card_height',e.target.value)}"></div>
+        Vitesse Câbles: <input type="number" .value="${c.flow_speed}" @input="${e=>this._up('flow_speed',e.target.value)}" step="0.1">
       </div>`;
 
-      if (t === 'flow') return html`${Array.from({length:20},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Flux ${i}</summary>
+      if (t === 'flow') return html`${Array.from({length:20},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px;"><summary>Flux ${i}</summary>
         Path SVG: <input type="text" style="width:100%" .value="${c[`f${i}_p`]||''}" @input="${e=>this._up(`f${i}_p`,e.target.value)}">
-        Entité (W): <input list="e" .value="${c[`f${i}_s`]||''}" @input="${e=>this._up(`f${i}_s`,e.target.value)}">
-        Couleur / Taille Bille: <div style="display:flex;gap:5px;"><input type="color" .value="${c[`f${i}_c`]||'#ffff00'}" @change="${e=>this._up(`f${i}_c`,e.target.value)}"><input type="number" .value="${c[`f${i}_w`]||3}" @input="${e=>this._up(`f${i}_w`,e.target.value)}"></div>
+        Entité: <input list="e" .value="${c[`f${i}_s`]||''}" @input="${e=>this._up(`f${i}_s`,e.target.value)}">
+        Couleur: <input type="color" .value="${c[`f${i}_c`]||'#ffff00'}" @change="${e=>this._up(`f${i}_c`,e.target.value)}">
       </details>`)}<datalist id="e">${ents.map(e => html`<option value="${e}">`)}</datalist>`;
 
       const pfx = {solar:Array.from({length:10},(_,i)=>`s${i+1}`), house:Array.from({length:10},(_,i)=>`h${i+1}`), bat:Array.from({length:5},(_,i)=>`b${i+1}`)}[t];
       return pfx.map(p => html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Objet ${p.toUpperCase()}</summary>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
           Nom: <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
-          Position X / Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_x']||0}" @input="${e=>this._up(p+'_x',e.target.value)}"><input type="number" .value="${c[p+'_y']||0}" @input="${e=>this._up(p+'_y',e.target.value)}"></div>
-          Taille Cadre W / H: <div style="display:flex;gap:2px;"><input type="number" placeholder="W" .value="${c[p+'_w_box']||120}" @input="${e=>this._up(p+'_w_box',e.target.value)}"><input type="number" placeholder="H" .value="${c[p+'_h_box']||''}" @input="${e=>this._up(p+'_h_box',e.target.value)}"></div>
+          X / Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_x']||0}" @input="${e=>this._up(p+'_x',e.target.value)}"><input type="number" .value="${c[p+'_y']||0}" @input="${e=>this._up(p+'_y',e.target.value)}"></div>
+          W / H Boite: <div style="display:flex;gap:2px;"><input type="number" placeholder="W" .value="${c[p+'_w_box']||120}" @input="${e=>this._up(p+'_w_box',e.target.value)}"><input type="number" placeholder="H" .value="${c[p+'_h_box']||''}" @input="${e=>this._up(p+'_h_box',e.target.value)}"></div>
           Entité 1: <input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
-          Unité 1: <input type="text" .value="${c[p+'_u']||'W'}" @input="${e=>this._up(p+'_u',e.target.value)}">
           Entité 2: <input list="e" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}">
-          Unité 2: <input type="text" .value="${c[p+'_u2']||(t==='bat'?'%':'V')}" @input="${e=>this._up(p+'_u2',e.target.value)}">
-          Couleur Néon: <input type="color" .value="${c[p+'_bc']||'#4caf50'}" @change="${e=>this._up(p+'_bc',e.target.value)}">
+          Couleur Néon: <input type="text" placeholder="#hex ou transparent" .value="${c[p+'_bc']||'#4caf50'}" @input="${e=>this._up(p+'_bc',e.target.value)}">
+          Fond Boite: <input type="text" placeholder="rgba(0,0,0,0) ou transparent" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}">
           Épaisseur / Arrondi: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_b_w']||2}" @input="${e=>this._up(p+'_b_w',e.target.value)}"><input type="number" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}"></div>
+          Unité 1 / 2: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_u']||'W'}" @input="${e=>this._up(p+'_u',e.target.value)}"><input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}"></div>
           Icone URL: <input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}">
-          Vitesse Néon(s): <input type="number" .value="${c[p+'_as']||3}" @input="${e=>this._up(p+'_as',e.target.value)}">
         </div></details><datalist id="e">${ents.map(e => html`<option value="${e}">`)}</datalist>`);
     }
   }
@@ -161,5 +170,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire V150 Absolute" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire V160 Pro" });
 })();
