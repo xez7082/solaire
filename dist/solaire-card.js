@@ -38,39 +38,36 @@
         const path = new Path2D(pD);
         const color = c['f'+i+'_c'] || '#ff0';
         const width = parseFloat(c['f'+i+'_w']) || 3;
-        const speed = (c.flow_speed || 3) * (v < 0 ? -1 : 1);
+        const speed = (c.flow_speed || 3);
         
         ctx.save();
-        // 1. Ligne de fond (tirets optionnels)
+        // 1. Ligne de câble fixe (très légère pour guider l'œil)
         ctx.strokeStyle = color;
         ctx.lineWidth = width;
-        ctx.setLineDash([c.dash_size || 10, c.dash_gap || 20]);
-        ctx.lineDashOffset = -this._offset * speed;
-        ctx.globalAlpha = 0.3; // Ligne plus discrète pour laisser briller la bille
+        ctx.globalAlpha = 0.15;
         ctx.stroke(path);
 
-        // 2. Les Billes (Orbs)
+        // 2. La Bille Unique (Single Orb)
         ctx.globalAlpha = 1.0;
         const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
         tempPath.setAttribute("d", pD);
         const pathLen = tempPath.getTotalLength();
         
-        // On dessine 3 billes qui se suivent pour un effet de flux continu
-        for (let b = 0; b < 3; b++) {
-            const spacing = (pathLen / 3) * b;
-            const progress = (this._offset * (c.flow_speed || 3) * 2);
-            const currentPos = (progress + spacing) % pathLen;
-            const finalPos = v < 0 ? pathLen - currentPos : currentPos; // Inversion du sens si négatif
-            
-            const pt = tempPath.getPointAtLength(finalPos);
+        // Calcul de la position (0 à 100%)
+        const progress = (this._offset * speed * 2) % pathLen;
+        // Inversion du sens si la valeur est négative
+        const finalPos = v < 0 ? pathLen - progress : progress;
+        
+        const pt = tempPath.getPointAtLength(finalPos);
 
-            ctx.beginPath();
-            ctx.fillStyle = "#fff";
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = color;
-            ctx.arc(pt.x, pt.y, width * 1.2, 0, Math.PI * 2);
-            ctx.fill();
-        }
+        // Effet de halo pour la bille
+        ctx.beginPath();
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = color;
+        ctx.fillStyle = "#fff"; // Centre blanc brillant
+        ctx.arc(pt.x, pt.y, width * 1.3, 0, Math.PI * 2);
+        ctx.fill();
+        
         ctx.restore();
       }
     }
@@ -150,15 +147,16 @@
     _up(k, v) { this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: { ...this._config, [k]: v } }, bubbles: true, composed: true })); }
     render() {
       const tabs = [{id:'solar',n:'Solar'},{id:'house',n:'House'},{id:'bat',n:'Bat'},{id:'weather',n:'Météo'},{id:'flow',n:'Flux'},{id:'gen',n:'Gen'}];
+      const ents = Object.keys(this.hass.states).sort();
       return html`<div style="background:#1c1c1c; color:white; padding:10px; font-family:sans-serif;">
         <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;">
           ${tabs.map(t => html`<button @click="${()=>this._tab=t.id}" style="flex:1; padding:8px; font-size:9px; background:${this._tab===t.id?'#4caf50':'#333'}; border:none; border-radius:4px; cursor:pointer; color:white;">${t.n.toUpperCase()}</button>`)}
         </div>
-        ${this._renderTabContent()}
+        ${this._renderTabContent(ents)}
       </div>`;
     }
-    _renderTabContent() {
-      const c = this._config, t = this._tab, ents = Object.keys(this.hass.states).sort();
+    _renderTabContent(ents) {
+      const c = this._config, t = this._tab;
       const pfx = {solar:['s1','s2','s3','s4','s5'], house:['h1','h2','h3','h4','h5'], bat:['b1','b2','b3']}[t];
       if (pfx) return pfx.map(p => html`<details style="background:#2b2b2b; margin-bottom:5px; padding:10px; border-radius:5px;"><summary>📦 ${p.toUpperCase()} : ${c[p+'_name']||''}</summary>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
@@ -177,13 +175,13 @@
         Temp <input list="ents" style="grid-column:span 2" .value="${c.w_temp_ent||''}" @input="${e=>this._up('w_temp_ent',e.target.value)}">
         Hum <input list="ents" style="grid-column:span 2" .value="${c.w_hum_ent||''}" @input="${e=>this._up('w_hum_ent',e.target.value)}">
         X <input type="number" .value="${c.w_x}" @input="${e=>this._up('w_x',e.target.value)}"> Y <input type="number" .value="${c.w_y}" @input="${e=>this._up('w_y',e.target.value)}">
-      </div>`;
+      </div><datalist id="ents">${ents.map(e => html`<option value="${e}">`)}</datalist>`;
       if (t === 'flow') return html`<div style="background:#2b2b2b; padding:10px;">${[1,2,3,4,5,6,7,8,9,10].map(i => html`<details style="margin-bottom:5px;"><summary>Flux ${i}</summary>
         Path <input type="text" style="width:100%" .value="${c['f'+i+'_p']||''}" @input="${e=>this._up('f'+i+'_p',e.target.value)}">
         Sensor <input list="ents" .value="${c['f'+i+'_s']||''}" @input="${e=>this._up('f'+i+'_s',e.target.value)}">
         Couleur <input type="color" .value="${c['f'+i+'_c']||'#ffff00'}" @change="${e=>this._up('f'+i+'_c',e.target.value)}">
         Largeur <input type="number" .value="${c['f'+i+'_w']||3}" @input="${e=>this._up('f'+i+'_w',e.target.value)}">
-      </details>`)}</div>`;
+      </details>`)}</div><datalist id="ents">${ents.map(e => html`<option value="${e}">`)}</datalist>`;
       if (t === 'gen') return html`<div style="padding:10px; background:#2b2b2b; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         Background URL <input type="text" style="grid-column:span 2" .value="${c.background_image}" @input="${e=>this._up('background_image',e.target.value)}">
         W <input type="number" .value="${c.card_width||500}" @input="${e=>this._up('card_width',e.target.value)}"> H <input type="number" .value="${c.card_height||400}" @input="${e=>this._up('card_height',e.target.value)}">
@@ -195,5 +193,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire Card Multi-Orb V65" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire Card Single Pulse V66" });
 })();
