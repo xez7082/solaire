@@ -1,520 +1,371 @@
-(function() {
-  const LitElement = Object.getPrototypeOf(customElements.get("ha-panel-lovelace")).prototype.constructor;
-  const html = LitElement.prototype.html;
-  const css = LitElement.prototype.css;
+class SolaireCardEditor extends LitElement {
 
-  const METEO_FR = {
-    'clear-night':'Nuit claire','cloudy':'Nuageux','fog':'Brouillard','hail':'Grêle',
-    'lightning':'Orages','lightning-rain':'Orages pluvieux','partlycloudy':'Partiellement nuageux',
-    'pouring':'Averses','rainy':'Pluvieux','snowy':'Neigeux','snowy-rainy':'Pluie et neige',
-    'sunny':'Ensoleillé','windy':'Venteux','windy-variant':'Venteux','exceptional':'Exceptionnel'
-  };
-
-  class SolaireCard extends LitElement {
-
-    static get properties(){ return { hass:{}, config:{} }; }
-
-    setConfig(config){
-      this.config={ card_width:1540, card_height:580, flow_speed:3, flow_th:2, ...config };
-    }
-
-    static getConfigElement(){
-      return document.createElement("solaire-card-editor");
-    }
-
-    firstUpdated(){ this._run(); }
-
-    disconnectedCallback(){
-      super.disconnectedCallback();
-      cancelAnimationFrame(this._f);
-    }
-
-    _run(){
-
-      const baseSpeed=(parseFloat(this.config.flow_speed)/10)||0.3;
-      const randomDrift=(Math.random()-0.5)*0.2;
-
-      let surge=0;
-      if(Math.random()<0.02) surge=Math.random()*4;
-
-      let drop=1;
-      if(Math.random()<0.01) drop=0;
-
-      this._offset=(this._offset||0)+(baseSpeed+randomDrift+surge)*drop;
-
-      if(this._offset>1000||this._offset<-1000) this._offset=0;
-
-      this._draw();
-      this._f=requestAnimationFrame(()=>this._run());
-    }
-
-    _draw(){
-
-      const cv=this.renderRoot.querySelector('#flowCanvas');
-      if(!cv) return;
-
-      const ctx=cv.getContext('2d');
-      ctx.clearRect(0,0,cv.width,cv.height);
-
-      const c=this.config;
-
-      for(let i=1;i<=20;i++){
-
-        const pD=c[`f${i}_p`];
-        const s=c[`f${i}_s`];
-
-        if(!pD || !this.hass?.states?.[s]) continue;
-
-        const v=parseFloat(this.hass.states[s].state)||0;
-        if(Math.abs(v)<=(c.flow_th||2)) continue;
-
-        const tempPath=document.createElementNS("http://www.w3.org/2000/svg","path");
-        tempPath.setAttribute("d",pD);
-
-        try{
-
-          const pathLen=tempPath.getTotalLength();
-          const speedFactor=Math.min(Math.abs(v)/1000,3);
-
-          const progress=(this._offset*(15+speedFactor*10))%pathLen;
-
-          const dir=v<0?-1:1;
-          const basePos=dir<0?pathLen-progress:progress;
-
-          let color=c[`f${i}_c`]||'#00ffff';
-
-          if(!c[`f${i}_c`]){
-            if(v>0) color='#00ff88';
-            if(v<0) color='#ff4444';
-          }
-
-          const flicker=0.7+Math.random()*0.6;
-
-          ctx.save();
-
-          for(let t=0;t<6;t++){
-
-            const trailOffset=t*12;
-            const trailPos=dir<0?basePos-trailOffset:basePos+trailOffset;
-
-            if(trailPos<0||trailPos>pathLen) continue;
-
-            const pt=tempPath.getPointAtLength(trailPos);
-
-            ctx.globalAlpha=(1-t/6)*flicker;
-            ctx.shadowBlur=(c[`f${i}_w`]||4)*6;
-            ctx.shadowColor=color;
-
-            ctx.fillStyle=color;
-
-            ctx.beginPath();
-            ctx.arc(pt.x,pt.y,(c[`f${i}_w`]||4)-t*0.5,0,Math.PI*2);
-            ctx.fill();
-          }
-
-          ctx.restore();
-
-        }catch{}
-      }
-    }
-
-    render(){
-
-      const c=this.config;
-      const keys=[];
-
-      for(let i=1;i<=10;i++){
-        keys.push(`s${i}`,`h${i}`);
-        if(i<=5) keys.push(`b${i}`,`w${i}`);
-      }
-
-      return html`
-        <ha-card style="width:${c.card_width}px;height:${c.card_height}px;background:#000;position:relative;overflow:hidden;border:none;">
-          <img src="${c.background_image}" class="bg-img">
-          <canvas id="flowCanvas" width="${c.card_width}" height="${c.card_height}"></canvas>
-
-          <div class="layer">
-            ${keys.map(p=>this._renderItem(p))}
-          </div>
-        </ha-card>
-      `;
-    }
-
-    _renderItem(p){
-
-      const c=this.config;
-
-      if(c[p+'_x']===undefined||c[p+'_y']===undefined) return '';
-
-      const s1=this.hass?.states?.[c[p+'_ent']];
-      const s2=this.hass?.states?.[c[p+'_ent2']];
-
-      let val1=s1?s1.state:'0';
-      let iconMeteo=null;
-
-      if(p.startsWith('w')&&s1){
-        const rawState=val1.toLowerCase().replace('-','');
-        val1=METEO_FR[rawState]||METEO_FR[val1]||val1;
-        iconMeteo=`hass:weather-${s1.state.replace('partlycloudy','partly-cloudy')}`;
-      }
-
-      const val2=s2?s2.state:null;
-
-      const isProduction=!p.startsWith('w')&&parseFloat(val1)>0;
-
-      const textColor=c[p+'_tc']||'#aaa';
-      const valueColor=c[p+'_vc']||'#fff';
-
-      const bCol=c[p+'_bc']||'#4caf50';
-      const isTransBorder=bCol==='transparent'||bCol==='none';
-
-      return html`
-        <div class="item-box"
-          style="
-            left:${c[p+'_x']}px;
-            top:${c[p+'_y']}px;
-            width:${c[p+'_w_box']||120}px;
-            height:${c[p+'_h_box']||'auto'}px;
-            --neon-color:${bCol};
-            --border-thickness:${isTransBorder?0:(c[p+'_b_w']||2)}px;
-            border-radius:${c[p+'_br']||12}px;
-          ">
-
-          <div class="inner-card"
-            style="background:${c[p+'_bg']||'rgba(15,15,15,0.55)'};border-radius:${c[p+'_br']||12}px;">
-
-            ${!p.startsWith('w')?html`
-              <div class="production-dot ${isProduction?'prod-on':'prod-off'}"></div>
-            `:''}
-
-            ${iconMeteo?html`
-              <ha-icon icon="${iconMeteo}"
-                style="margin-right:12px;--mdc-icon-size:${c[p+'_img_w']||35}px;color:#fff;flex-shrink:0;">
-              </ha-icon>
-            `:''}
-
-            <div class="content">
-
-              ${c[p+'_img']&&!p.startsWith('w')
-                ?html`<img src="${c[p+'_img']}" width="${c[p+'_img_w']||35}" style="margin-bottom:4px;">`
-                :''}
-
-              <div class="label"
-                style="color:${textColor};font-size:${c[p+'_fs_l']||10}px;">
-                ${c[p+'_name']||''}
-              </div>
-
-              <div class="value"
-                style="color:${valueColor};font-size:${c[p+'_fs_v']||15}px;">
-                ${val1}${c[p+'_u']||''}
-              </div>
-
-              ${val2!==null?html`
-                <div class="value2"
-                  style="color:${c[p+'_v2c']||'#4caf50'};font-size:${c[p+'_fs_v2']||12}px;">
-                  ${val2}${c[p+'_u2']||''}
-                </div>
-              `:''}
-
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    static get styles(){
-      return css`
-      ha-card{
-        position:relative;
-        overflow:hidden;
-      }
-
-      .bg-img{
-        position:absolute;
-        width:100%;
-        height:100%;
-        object-fit:cover;
-        z-index:1;
-      }
-
-      #flowCanvas{
-        position:absolute;
-        z-index:5;
-        pointer-events:none;
-      }
-
-      .layer{
-        position:absolute;
-        width:100%;
-        height:100%;
-        z-index:10;
-        pointer-events:none;
-      }
-
-      .item-box{
-        position:absolute;
-        padding:var(--border-thickness);
-        display:flex;
-        box-sizing:border-box;
-        pointer-events:auto;
-      }
-
-      .inner-card{
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        padding:10px;
-        width:100%;
-        height:100%;
-        box-sizing:border-box;
-
-        backdrop-filter:blur(12px);
-        -webkit-backdrop-filter:blur(12px);
-
-        background:rgba(15,15,15,0.55);
-      }
-
-      .production-dot{
-        position:absolute;
-        top:6px;
-        right:6px;
-        width:10px;
-        height:10px;
-        border-radius:50%;
-      }
-
-      .prod-on{
-        background:#00ff88;
-        animation:blink 1s infinite alternate;
-      }
-
-      .prod-off{
-        background:#ff4444;
-        animation:blink 1s infinite alternate;
-      }
-
-      @keyframes blink{
-        from{opacity:1;}
-        to{opacity:0.3;}
-      }
-      `;
-    }
+  static get properties(){
+    return { _config:{}, _tab:{type:String}, _preview:{} };
   }
 
-  class SolaireCardEditor extends LitElement {
+  constructor(){
+    super();
+    this._tab='gen';
+    this._preview=null;
+  }
 
-    static get properties(){
-      return { _config:{}, _tab:{type:String} };
-    }
+  setConfig(config){
+    this._config=config;
+  }
 
-    constructor(){
-      super();
-      this._tab='gen';
-    }
+  updated(){
+    this._updatePreview();
+  }
 
-    setConfig(config){ this._config=config; }
+  _up(k,v){
+    this.dispatchEvent(new CustomEvent("config-changed",{
+      detail:{config:{...this._config,[k]:v}},
+      bubbles:true,
+      composed:true
+    }));
+  }
 
-    _up(k,v){
-      this.dispatchEvent(new CustomEvent("config-changed",{
-        detail:{config:{...this._config,[k]:v}},
-        bubbles:true,
-        composed:true
-      }));
-    }
+  /* -----------------------------
+     LIVE PREVIEW ENGINE
+  ----------------------------- */
 
-    render(){
+  _updatePreview(){
+    if(!this.shadowRoot) return;
 
-      const tabs=[
-        {id:'gen',n:'Global'},
-        {id:'flow',n:'Câbles'},
-        {id:'solar',n:'Panneaux'},
-        {id:'house',n:'Charges'},
-        {id:'bat',n:'Batteries'},
-        {id:'meteo',n:'Météo'}
-      ];
+    const card=this.shadowRoot.querySelector("#preview-card");
+    if(!card) return;
 
-      const ents=Object.keys(this.hass?.states||{}).sort();
+    const c=this._config||{};
 
-      return html`
-      <div style="background:#1a1a1a;color:#eee;padding:15px;font-family:sans-serif;">
+    card.style.width=(c.card_width||400)+"px";
+    card.style.height=(c.card_height||250)+"px";
 
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:15px;">
-          ${tabs.map(t=>html`
-          <button @click=${()=>this._tab=t.id}
-            style="flex:1;min-width:80px;padding:10px;
-            background:${this._tab===t.id?'#4caf50':'#333'};
-            border:none;color:#fff;border-radius:4px;
-            cursor:pointer;font-size:10px;font-weight:bold;">
-            ${t.n.toUpperCase()}
-          </button>
-          `)}
+    card.style.backgroundImage=`url(${c.background_image||''})`;
+  }
+
+  /* -----------------------------
+     RENDER
+  ----------------------------- */
+
+  render(){
+
+    const tabs=[
+      {id:'gen',n:'⚙️ Global'},
+      {id:'flow',n:'⚡ Flux'},
+      {id:'solar',n:'☀️ Solar'},
+      {id:'house',n:'🏠 Maison'},
+      {id:'bat',n:'🔋 Batterie'},
+      {id:'meteo',n:'🌦️ Météo'}
+    ];
+
+    const ents=Object.keys(this.hass?.states||{}).sort();
+
+    return html`
+    <div class="editor-root">
+
+      <div class="editor-header">
+        Dashboard Solaire V2 Ultra Premium
+      </div>
+
+      <div class="editor-body">
+
+        <div class="editor-left">
+
+          <div class="tab-grid">
+            ${tabs.map(t=>html`
+              <button class="tab-btn ${this._tab===t.id?'active':''}"
+                @click=${()=>this._tab=t.id}>
+                ${t.n}
+              </button>
+            `)}
+          </div>
+
+          <div class="editor-scroll">
+            ${this._renderTabContent(ents)}
+          </div>
+
         </div>
 
-        <div style="max-height:550px;overflow-y:auto">
-          ${this._renderTabContent(ents)}
-        </div>
+        <div class="editor-right">
 
-        <datalist id="e">
-          ${ents.map(e=>html`<option value="${e}">`)}
-        </datalist>
+          <div id="preview-card" class="preview-card"></div>
+
+        </div>
 
       </div>
-      `;
-    }
 
-    _renderTabContent(ents){
+      <datalist id="e">
+        ${ents.map(e=>html`<option value="${e}">`)}
+      </datalist>
 
-      const c=this._config;
-      const t=this._tab;
+    </div>
+    `;
+  }
 
-      if(t==='gen') return html`
-      <div style="display:grid;gap:10px;">
-        Fond URL:
-        <input type="text"
-          .value=${c.background_image||''}
-          @input=${e=>this._up('background_image',e.target.value)}>
+  /* -----------------------------
+     SECTION BUILDER
+  ----------------------------- */
 
-        W/H Carte:
-        <div style="display:flex;gap:5px;">
-          <input type="number"
-            .value=${c.card_width}
-            @input=${e=>this._up('card_width',e.target.value)}>
+  _section(title,content){
+    return html`
+    <div class="section-box">
+      <div class="section-title">${title}</div>
+      ${content}
+    </div>
+    `;
+  }
 
-          <input type="number"
-            .value=${c.card_height}
-            @input=${e=>this._up('card_height',e.target.value)}>
-        </div>
+  _input(label,field,type='text',extra=''){
+
+    const c=this._config||{};
+
+    return html`
+    <div class="input-group">
+      <span class="input-label">${label}</span>
+
+      <input
+        ${extra}
+        type=${type}
+        .value=${c[field]||''}
+        @input=${e=>this._up(field,e.target.value)}
+      >
+    </div>
+    `;
+  }
+
+  /* -----------------------------
+     TAB CONTENT
+  ----------------------------- */
+
+  _renderTabContent(ents){
+
+    const c=this._config||{};
+    const t=this._tab;
+
+    /* Global */
+    if(t==='gen') return this._section("Configuration générale",html`
+
+      ${this._input("Fond d'écran URL","background_image")}
+
+      <div class="grid-2">
+        ${this._input("Largeur carte","card_width","number")}
+        ${this._input("Hauteur carte","card_height","number")}
       </div>
-      `;
 
-      if(t==='flow') return html`
+    `);
+
+    /* Flux */
+    if(t==='flow') return this._section("Flux énergétiques",html`
+
       ${Array.from({length:20},(_,i)=>i+1).map(i=>html`
-        <details style="background:#222;margin-bottom:5px;padding:8px;">
+
+        <details class="accordion-box">
           <summary>Flux ${i}</summary>
 
-          Path SVG:
-          <input style="width:100%" list="e"
-            .value=${c[`f${i}_p`]||''}
-            @input=${e=>this._up(`f${i}_p`,e.target.value)}>
+          ${this._input("Path SVG",`f${i}_p`,`text`,'list="e" style="width:100%"')}
+          ${this._input("Entité",`f${i}_s`,`text`,'list="e"')}
 
-          Entité:
-          <input list="e"
-            .value=${c[`f${i}_s`]||''}
-            @input=${e=>this._up(`f${i}_s`,e.target.value)}>
         </details>
+
       `)}
-      `;
 
-      const pfx={
-        solar:Array.from({length:10},(_,i)=>`s${i+1}`),
-        house:Array.from({length:10},(_,i)=>`h${i+1}`),
-        bat:Array.from({length:5},(_,i)=>`b${i+1}`),
-        meteo:Array.from({length:5},(_,i)=>`w${i+1}`)
-      }[t];
+    `);
 
-      return pfx.map(p=>html`
-      <details style="background:#222;margin-bottom:5px;padding:8px;border-radius:4px;">
-        <summary>Objet ${p.toUpperCase()}</summary>
+    const groups={
+      solar:Array.from({length:10},(_,i)=>`s${i+1}`),
+      house:Array.from({length:10},(_,i)=>`h${i+1}`),
+      bat:Array.from({length:5},(_,i)=>`b${i+1}`),
+      meteo:Array.from({length:5},(_,i)=>`w${i+1}`)
+    };
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+    const pfx=groups[t];
 
-        Nom:
-        <input type="text"
-          .value=${c[p+'_name']||''}
-          @input=${e=>this._up(p+'_name',e.target.value)}>
+    if(!pfx) return '';
 
-        Couleur Texte:
-        <input type="color"
-          .value=${c[p+'_tc']||'#aaa'}
-          @input=${e=>this._up(p+'_tc',e.target.value)}>
+    return this._section("Configuration objets",html`
 
-        Couleur Valeur:
-        <input type="color"
-          .value=${c[p+'_vc']||'#ffffff'}
-          @input=${e=>this._up(p+'_vc',e.target.value)}>
+      ${pfx.map(p=>html`
 
-        X / Y:
-        <div style="display:flex;gap:2px;">
-          <input type="number"
-            .value=${c[p+'_x']}
-            @input=${e=>this._up(p+'_x',e.target.value)}>
+      <details class="accordion-box">
 
-          <input type="number"
-            .value=${c[p+'_y']}
-            @input=${e=>this._up(p+'_y',e.target.value)}>
+        <summary>${p.toUpperCase()}</summary>
+
+        ${this._input("Nom",`${p}_name`)}
+        ${this._input("Couleur texte",`${p}_tc`,`color`)}
+        ${this._input("Couleur valeur",`${p}_vc`,`color`)}
+
+        <div class="grid-2">
+          ${this._input("X",`${p}_x`,`number`)}
+          ${this._input("Y",`${p}_y`,`number`)}
         </div>
 
-        Taille Police:
-        <div style="display:flex;gap:2px;">
-          <input type="number" .value=${c[p+'_fs_l']||10}
-            @input=${e=>this._up(p+'_fs_l',e.target.value)}>
-
-          <input type="number" .value=${c[p+'_fs_v']||15}
-            @input=${e=>this._up(p+'_fs_v',e.target.value)}>
-
-          <input type="number" .value=${c[p+'_fs_v2']||12}
-            @input=${e=>this._up(p+'_fs_v2',e.target.value)}>
+        <div class="grid-2">
+          ${this._input("Police label",`${p}_fs_l`,`number`)}
+          ${this._input("Police valeur",`${p}_fs_v`,`number`)}
         </div>
 
-        W / H Boite:
-        <div style="display:flex;gap:2px;">
-          <input type="number"
-            .value=${c[p+'_w_box']||120}
-            @input=${e=>this._up(p+'_w_box',e.target.value)}>
+        ${this._input("Largeur boite",`${p}_w_box`,`number`)}
+        ${this._input("Hauteur boite",`${p}_h_box`,`number`)}
 
-          <input type="number"
-            .value=${c[p+'_h_box']||''}
-            @input=${e=>this._up(p+'_h_box',e.target.value)}>
+        <div class="grid-2">
+          ${this._input("Entité 1",`${p}_ent`,`text`,'list="e"')}
+          ${this._input("Entité 2",`${p}_ent2`,`text`,'list="e"')}
         </div>
 
-        Entité 1 / 2:
-        <div style="display:flex;gap:2px;">
-          <input list="e"
-            .value=${c[p+'_ent']||''}
-            @input=${e=>this._up(p+'_ent',e.target.value)}>
-
-          <input list="e"
-            .value=${c[p+'_ent2']||''}
-            @input=${e=>this._up(p+'_ent2',e.target.value)}>
+        <div class="grid-2">
+          ${this._input("Unité 1",`${p}_u`)}
+          ${this._input("Unité 2",`${p}_u2`)}
         </div>
 
-        Unités:
-        <div style="display:flex;gap:2px;">
-          <input type="text"
-            .value=${c[p+'_u']||''}
-            @input=${e=>this._up(p+'_u',e.target.value)}>
+        ${this._input("Fond",`${p}_bg`)}
+        ${this._input("Néon",`${p}_bc`)}
+        ${this._input("Taille icône",`${p}_img_w`,`number`)}
 
-          <input type="text"
-            .value=${c[p+'_u2']||''}
-            @input=${e=>this._up(p+'_u2',e.target.value)}>
-        </div>
-
-        Fond / Néon:
-        <div style="display:flex;gap:2px;">
-          <input type="text" placeholder="Fond"
-            .value=${c[p+'_bg']||''}
-            @input=${e=>this._up(p+'_bg',e.target.value)}>
-
-          <input type="text" placeholder="Néon"
-            .value=${c[p+'_bc']||''}
-            @input=${e=>this._up(p+'_bc',e.target.value)}>
-        </div>
-
-        Taille Icône:
-        <input type="number"
-          .value=${c[p+'_img_w']||35}
-          @input=${e=>this._up(p+'_img_w',e.target.value)}>
-
-        </div>
       </details>
-      `);
-    }
+
+      `)}
+
+    `);
   }
 
-  customElements.define("solaire-card-editor", SolaireCardEditor);
-  customElements.define("solaire-card", SolaireCard);
+  /* -----------------------------
+     STYLE ULTRA PREMIUM
+  ----------------------------- */
 
-  window.customCards=window.customCards||[];
-  window.customCards.push({type:"solaire-card",name:"Solaire V210 French"});
+  static get styles(){
+    return css`
 
-})();
+    .editor-root{
+      background:#0f0f0f;
+      color:#fff;
+      border-radius:16px;
+      padding:18px;
+      font-family:sans-serif;
+    }
+
+    .editor-header{
+      text-align:center;
+      font-size:20px;
+      font-weight:bold;
+      margin-bottom:18px;
+      letter-spacing:1px;
+    }
+
+    .editor-body{
+      display:grid;
+      grid-template-columns:320px 1fr;
+      gap:18px;
+    }
+
+    .editor-left{
+      border-right:1px solid #222;
+      padding-right:12px;
+    }
+
+    .editor-right{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+    }
+
+    .preview-card{
+      background-size:cover;
+      background-position:center;
+      border-radius:14px;
+      box-shadow:0 0 40px rgba(0,255,136,0.2);
+      transition:all .4s ease;
+    }
+
+    .tab-grid{
+      display:grid;
+      gap:6px;
+      margin-bottom:16px;
+    }
+
+    .tab-btn{
+      padding:10px;
+      border:none;
+      border-radius:8px;
+      background:#222;
+      color:white;
+      cursor:pointer;
+      transition:.2s;
+      font-weight:bold;
+    }
+
+    .tab-btn:hover{
+      background:#333;
+    }
+
+    .tab-btn.active{
+      background:#00ff88;
+      color:black;
+    }
+
+    .editor-scroll{
+      max-height:520px;
+      overflow-y:auto;
+      padding-right:6px;
+    }
+
+    .section-box{
+      background:#151515;
+      padding:14px;
+      border-radius:12px;
+      margin-bottom:12px;
+    }
+
+    .section-title{
+      color:#00ff88;
+      font-weight:bold;
+      margin-bottom:12px;
+    }
+
+    .input-group{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      font-size:12px;
+      margin-bottom:10px;
+    }
+
+    .input-label{
+      opacity:.8;
+    }
+
+    input{
+      padding:7px;
+      border-radius:8px;
+      border:none;
+      background:#222;
+      color:white;
+      outline:none;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+
+    .accordion-box{
+      background:#222;
+      padding:10px;
+      border-radius:10px;
+      margin-bottom:8px;
+    }
+
+    summary{
+      cursor:pointer;
+      font-weight:bold;
+      color:#00ff88;
+    }
+
+    `;
+
+  }
+
+}
+
+customElements.define("solaire-card-editor", SolaireCardEditor);
