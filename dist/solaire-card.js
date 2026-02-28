@@ -29,31 +29,74 @@
     firstUpdated() { this._run(); }
     disconnectedCallback() { cancelAnimationFrame(this._f); }
 
-    _draw() {
-      const cv = this.renderRoot.querySelector('#flowCanvas');
-      if (!cv) return;
-      const ctx = cv.getContext('2d');
-      ctx.clearRect(0, 0, cv.width, cv.height);
-      const c = this.config;
-      for (let i = 1; i <= 20; i++) {
-        const pD = c[`f${i}_p`], s = c[`f${i}_s`];
-        if (!pD || !this.hass.states[s]) continue;
-        const v = parseFloat(this.hass.states[s].state) || 0;
-        if (Math.abs(v) <= (c.flow_th || 2)) continue;
-        const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        tempPath.setAttribute("d", pD);
-        try {
-          const pathLen = tempPath.getTotalLength();
-          const progress = (this._offset * 25) % pathLen;
-          const pt = tempPath.getPointAtLength(v < 0 ? pathLen - progress : progress);
-          ctx.save();
-          ctx.shadowBlur = (c[`f${i}_w`]||3)*4; ctx.shadowColor = c[`f${i}_c`] || '#ff0';
-          ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(pt.x, pt.y, c[`f${i}_w`]||3, 0, Math.PI*2); ctx.fill();
-          ctx.restore();
-        } catch(e) {}
-      }
-    }
+_draw() {
+  const cv = this.renderRoot.querySelector('#flowCanvas');
+  if (!cv) return;
 
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  const c = this.config;
+
+  for (let i = 1; i <= 20; i++) {
+
+    const pD = c[`f${i}_p`];
+    const s = c[`f${i}_s`];
+    if (!pD || !this.hass.states[s]) continue;
+
+    const v = parseFloat(this.hass.states[s].state) || 0;
+    if (Math.abs(v) <= (c.flow_th || 2)) continue;
+
+    const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    tempPath.setAttribute("d", pD);
+
+    try {
+      const pathLen = tempPath.getTotalLength();
+      const speedFactor = Math.min(Math.abs(v) / 1000, 3);
+      const progress = (this._offset * (15 + speedFactor * 10)) % pathLen;
+
+      const dir = v < 0 ? -1 : 1;
+      const basePos = dir < 0 ? pathLen - progress : progress;
+
+      // 🎨 Couleur dynamique auto
+      let color = c[`f${i}_c`] || '#00ffff';
+      if (!c[`f${i}_c`]) {
+        if (v > 0) color = '#00ff88';     // vert production
+        if (v < 0) color = '#ff4444';     // rouge import
+      }
+
+      // ⚡ Scintillement aléatoire
+      const flicker = 0.7 + Math.random() * 0.6;
+
+      ctx.save();
+
+      for (let t = 0; t < 6; t++) {
+        const trailOffset = t * 12;
+        const trailPos = dir < 0
+          ? basePos - trailOffset
+          : basePos + trailOffset;
+
+        if (trailPos < 0 || trailPos > pathLen) continue;
+
+        const pt = tempPath.getPointAtLength(trailPos);
+
+        ctx.globalAlpha = (1 - t / 6) * flicker;
+
+        ctx.shadowBlur = (c[`f${i}_w`] || 4) * 6;
+        ctx.shadowColor = color;
+
+        ctx.fillStyle = color;
+
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, (c[`f${i}_w`] || 4) - t * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+    } catch (e) {}
+  }
+}
     render() {
       const c = this.config;
       const keys = [];
