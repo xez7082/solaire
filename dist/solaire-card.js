@@ -19,12 +19,38 @@
 
     static getConfigElement() { return document.createElement("solaire-card-editor"); }
 
-    _run() {
-      this._offset = (this._offset || 0) + (parseFloat(this.config.flow_speed) / 10 || 0.3);
-      if (this._offset > 100) this._offset = 0;
-      this._draw();
-      this._f = requestAnimationFrame(() => this._run());
-    }
+   _run() {
+
+  // Vitesse de base
+  const baseSpeed = (parseFloat(this.config.flow_speed) / 10) || 0.3;
+
+  // Variation aléatoire permanente (instabilité réseau)
+  const randomDrift = (Math.random() - 0.5) * 0.2;
+
+  // Micro surtension occasionnelle
+  let surge = 0;
+  if (Math.random() < 0.02) {        // 2% de chance par frame
+    surge = Math.random() * 4;       // boost brutal
+  }
+
+  // Micro coupure occasionnelle
+  let drop = 1;
+  if (Math.random() < 0.01) {        // 1% chance
+    drop = 0;                        // arrêt brutal
+  }
+
+  // Offset final
+  this._offset = (this._offset || 0) + (baseSpeed + randomDrift + surge) * drop;
+
+  // Reset propre
+  if (this._offset > 1000 || this._offset < -1000) {
+    this._offset = 0;
+  }
+
+  this._draw();
+
+  this._f = requestAnimationFrame(() => this._run());
+}
 
     firstUpdated() { this._run(); }
     disconnectedCallback() { cancelAnimationFrame(this._f); }
