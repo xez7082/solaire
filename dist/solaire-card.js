@@ -1,5 +1,4 @@
 (function() {
-  // Suppression des anciennes instances si elles existent pour forcer la mise à jour
   const LitElement = Object.getPrototypeOf(customElements.get("ha-panel-lovelace")).prototype.constructor;
   const html = LitElement.prototype.html;
   const css = LitElement.prototype.css;
@@ -24,11 +23,7 @@
 
   class SolaireCard extends LitElement {
     static get properties() { return { hass: {}, config: {} }; }
-    
-    setConfig(config) {
-      this.config = { card_width: 1540, card_height: 580, flow_speed: 3, flow_th: 2, ...config };
-    }
-
+    setConfig(config) { this.config = { card_width: 1540, card_height: 580, flow_speed: 3, flow_th: 2, ...config }; }
     static getConfigElement() { return document.createElement("solaire-card-editor"); }
 
     _run() {
@@ -37,7 +32,6 @@
       this._draw();
       this._f = requestAnimationFrame(() => this._run());
     }
-
     firstUpdated() { this._run(); }
     disconnectedCallback() { cancelAnimationFrame(this._f); }
 
@@ -71,7 +65,6 @@
       const keys = [];
       for(let i=1; i<=10; i++) { keys.push(`s${i}`, `h${i}`); if(i<=5) { keys.push(`b${i}`, `w${i}`); } }
       const sparks = Array.from({length:10}, (_, i) => `sp${i+1}`);
-
       return html`
         <ha-card style="width:${c.card_width}px; height:${c.card_height}px; background:#000; border:none;">
           <img src="${c.background_image}" class="bg-img">
@@ -90,10 +83,7 @@
         if (!trigger || (trigger.state !== 'on' && trigger.state !== 'active')) return '';
         const color = c[p+'_c'] || '#4fc3f7';
         const size = c[p+'_w'] || 15;
-        return html`
-            <div class="real-spark" style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; --spark-color:${color}; --spark-size:${size}px;">
-                <div class="s-core"></div><div class="s-arm a1"></div><div class="s-arm a2"></div><div class="s-arm a3"></div><div class="s-arm a4"></div>
-            </div>`;
+        return html`<div class="real-spark" style="left:${c[p+'_x']}px; top:${c[p+'_y']}px; --spark-color:${color}; --spark-size:${size}px;"><div class="s-core"></div><div class="s-arm a1"></div><div class="s-arm a2"></div><div class="s-arm a3"></div><div class="s-arm a4"></div></div>`;
     }
 
     _renderItem(p) {
@@ -118,8 +108,7 @@
       const borderRadius = c[p+'_br'] !== undefined ? c[p+'_br'] : 12;
       return html`
         <div class="item-box ${active && effect === 'halo' ? 'animated-border' : ''}" style="
-          left:${c[p+'_x']}px; top:${c[p+'_y']}px; 
-          width:${c[p+'_w_box'] || 120}px; height:${c[p+'_h_box'] || 'auto'}px;
+          left:${c[p+'_x']}px; top:${c[p+'_y']}px; width:${c[p+'_w_box'] || 120}px; height:${c[p+'_h_box'] || 'auto'}px;
           --neon-color:${bCol}; border-radius:${borderRadius}px;
           --border-thickness:${(effect === 'halo') ? (c[p+'_b_w'] || 2) : 0}px;
         ">
@@ -156,6 +145,9 @@
       .pulse-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; z-index: 20; animation: pulse-anim 1.5s infinite; }
       .pulse-rect { position: absolute; bottom: 8px; left: 8px; width: 12px; height: 4px; border-radius: 1px; z-index: 20; animation: pulse-anim 1.5s infinite; }
       @keyframes pulse-anim { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
+      @keyframes spin { 100% { transform: rotate(360deg); } }
+      @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
       .content { flex-grow: 1; text-align: center; display: flex; flex-direction: column; justify-content: center; overflow: hidden; z-index: 3; }
       .label { font-weight: bold; text-transform: uppercase; white-space: nowrap; }
       .value { font-weight: 900; line-height: 1.1; }
@@ -186,11 +178,12 @@
       if (t === 'sparks') return html`${Array.from({length:10},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Étincelle ${i}</summary><div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">X/Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[`sp${i}_x`]}" @input="${e=>this._up(`sp${i}_x`,e.target.value)}"><input type="number" .value="${c[`sp${i}_y`]}" @input="${e=>this._up(`sp${i}_y`,e.target.value)}"></div> Couleur: <input type="text" .value="${c[`sp${i}_c`]||'#4fc3f7'}" @input="${e=>this._up(`sp${i}_c`,e.target.value)}"> Taille: <input type="number" .value="${c[`sp${i}_w`]||15}" @input="${e=>this._up(`sp${i}_w`,e.target.value)}"> Déclencheur: <input list="e" .value="${c[`sp${i}_ent`]||''}" @input="${e=>this._up(`sp${i}_ent`,e.target.value)}"></div></details>`)}${datalist}`;
       if (t === 'flow') return html`${Array.from({length:20},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Câble ${i}</summary><div style="display:grid; gap:5px; margin-top:8px;">Path: <input type="text" .value="${c[`f${i}_p`]||''}" @input="${e=>this._up(`f${i}_p`,e.target.value)}"> Entité: <input list="e" .value="${c[`f${i}_s`]||''}" @input="${e=>this._up(`f${i}_s`,e.target.value)}"> Coul/Ep: <div style="display:flex;gap:5px;"><input type="text" .value="${c[`f${i}_c`]||'#ff0'}" @input="${e=>this._up(`f${i}_c`,e.target.value)}"><input type="number" .value="${c[`f${i}_w`]||3}" @input="${e=>this._up(`f${i}_w`,e.target.value)}"></div></div></details>`)}${datalist}`;
       const pfx = {solar:Array.from({length:10},(_,i)=>`s${i+1}`), house:Array.from({length:10},(_,i)=>`h${i+1}`), bat:Array.from({length:5},(_,i)=>`b${i+1}`), meteo:Array.from({length:5},(_,i)=>`w${i+1}`)}[t];
-      return pfx.map(p => html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Objet ${p.toUpperCase()}</summary><div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">Nom: <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}"> X/Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"><input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}"></div> Effet: <select @change="${e=>this._up(p+'_effect',e.target.value)}"><option value="halo" ?selected="${c[p+'_effect']==='halo'}">Halo</option><option value="pulse" ?selected="${c[p+'_effect']==='pulse'}">Point</option><option value="rect" ?selected="${c[p+'_effect']==='rect'}">Voyant</option><option value="none" ?selected="${c[p+'_effect']==='none'}">Aucun</option></select> Fond/Néon: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}"><input type="text" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}"></div> W/H Box: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_w_box']||120}" @input="${e=>this._up(p+'_w_box',e.target.value)}"><input type="number" .value="${c[p+'_h_box']||''}" @input="${e=>this._up(p+'_h_box',e.target.value)}"></div> <div style="grid-column: span 2; background: #2196f344; padding: 4px; font-size: 10px; text-align: center;">POLICES</div> Nom: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_tc']||'#aaa'}" @input="${e=>this._up(p+'_tc',e.target.value)}"><input type="number" .value="${c[p+'_fs_l']||10}" @input="${e=>this._up(p+'_fs_l',e.target.value)}"></div> V1: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_vc']||'#fff'}" @input="${e=>this._up(p+'_vc',e.target.value)}"><input type="number" .value="${c[p+'_fs_v']||15}" @input="${e=>this._up(p+'_fs_v',e.target.value)}"></div> V2: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_v2c']||'#4caf50'}" @input="${e=>this._up(p+'_v2c',e.target.value)}"><input type="number" .value="${c[p+'_fs_v2']||12}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}"></div> Entités: <div style="display:flex;gap:2px;"><input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}"><input list="e" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}"></div> Unités: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_u']||''}" @input="${e=>this._up(p+'_u',e.target.value)}"><input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}"></div> Icone: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}"><input type="number" .value="${c[p+'_img_w']||35}" @input="${e=>this._up(p+'_img_w',e.target.value)}"></div></div></details>${datalist}`);
+      return pfx.map(p => html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Objet ${p.toUpperCase()}</summary><div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">Nom: <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}"> X/Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"><input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}"></div> Effet: <select @change="${e=>this._up(p+'_effect',e.target.value)}"><option value="halo" ?selected="${c[p+'_effect']==='halo'}">Halo</option><option value="pulse" ?selected="${c[p+'_effect']==='pulse'}">Point</option><option value="rect" ?selected="${c[p+'_effect']==='rect'}">Voyant</option><option value="none" ?selected="${c[p+'_effect']==='none'}">Aucun</option></select> Fond/Néon: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}"><input type="text" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}"></div> 
+        Rayon / Bordure: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}"><input type="number" .value="${c[p+'_b_w']||2}" @input="${e=>this._up(p+'_b_w',e.target.value)}"></div>
+        W/H Box: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_w_box']||120}" @input="${e=>this._up(p+'_w_box',e.target.value)}"><input type="number" .value="${c[p+'_h_box']||''}" @input="${e=>this._up(p+'_h_box',e.target.value)}"></div> <div style="grid-column: span 2; background: #2196f344; padding: 4px; font-size: 10px; text-align: center;">POLICES</div> Nom: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_tc']||'#aaa'}" @input="${e=>this._up(p+'_tc',e.target.value)}"><input type="number" .value="${c[p+'_fs_l']||10}" @input="${e=>this._up(p+'_fs_l',e.target.value)}"></div> V1: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_vc']||'#fff'}" @input="${e=>this._up(p+'_vc',e.target.value)}"><input type="number" .value="${c[p+'_fs_v']||15}" @input="${e=>this._up(p+'_fs_v',e.target.value)}"></div> V2: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_v2c']||'#4caf50'}" @input="${e=>this._up(p+'_v2c',e.target.value)}"><input type="number" .value="${c[p+'_fs_v2']||12}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}"></div> Entités: <div style="display:flex;gap:2px;"><input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}"><input list="e" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}"></div> Unités: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_u']||''}" @input="${e=>this._up(p+'_u',e.target.value)}"><input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}"></div> Icone: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}"><input type="number" .value="${c[p+'_img_w']||35}" @input="${e=>this._up(p+'_img_w',e.target.value)}"></div></div></details>${datalist}`);
     }
   }
 
-  // Double enregistrement pour être sûr
   if (!customElements.get("solaire-card-editor")) customElements.define("solaire-card-editor", SolaireCardEditor);
   if (!customElements.get("solaire-card")) customElements.define("solaire-card", SolaireCard);
 })();
