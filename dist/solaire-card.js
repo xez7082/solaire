@@ -137,18 +137,13 @@
       .layer { position: absolute; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
       .item-box { position: absolute; padding: var(--border-thickness); overflow: hidden; display: flex; box-sizing: border-box; }
       .inner-card { display: flex; align-items: center; padding: 10px; width: 100%; z-index: 2; backdrop-filter: blur(5px); height: 100%; box-sizing: border-box; position: relative; }
-      
       .animated-border::before { content: ''; position: absolute; z-index: 1; left: -50%; top: -50%; width: 200%; height: 200%; background-image: conic-gradient(transparent, transparent, transparent, var(--neon-color)); animation: rotate 3s linear infinite; }
       @keyframes rotate { 100% { transform: rotate(1turn); } }
-      
       .pulse-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; z-index: 20; animation: pulse-anim 1.5s infinite; }
       @keyframes pulse-anim { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(1.3); } 100% { opacity: 1; transform: scale(1); } }
-      
-      /* MÉTÉO ANIMATIONS */
       @keyframes spin { 100% { transform: rotate(360deg); } }
       @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
       @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-
       .content { flex-grow: 1; text-align: center; display: flex; flex-direction: column; justify-content: center; overflow: hidden; z-index: 3; }
       .label { font-weight: bold; text-transform: uppercase; white-space: nowrap; }
       .value { font-weight: 900; line-height: 1.1; }
@@ -156,7 +151,6 @@
     `; }
   }
 
-  // --- EDITOR CODE ---
   class SolaireCardEditor extends LitElement {
     static get properties() { return { _config: {}, _tab: {type: String} }; }
     constructor() { super(); this._tab = 'gen'; }
@@ -167,31 +161,54 @@
       const tabs = [{id:'gen',n:'Global'},{id:'flow',n:'Câbles'},{id:'solar',n:'Panneaux'},{id:'house',n:'Charges'},{id:'bat',n:'Batteries'},{id:'meteo',n:'Météo'}];
       const ents = Object.keys(this.hass.states).sort();
       return html`
-        <div style="background:#1a1a1a; color:#eee; padding:15px; font-family:sans-serif;">
+        <div style="background:#1a1a1a; color:#eee; padding:15px; font-family:sans-serif; border-radius:8px;">
           <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:15px;">
             ${tabs.map(t => html`<button @click="${()=>this._tab=t.id}" style="flex:1; min-width:80px; padding:10px; background:${this._tab===t.id?'#4caf50':'#333'}; border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">${t.n.toUpperCase()}</button>`)}
           </div>
-          <div style="max-height: 550px; overflow-y: auto;">${this._renderTabContent(ents)}</div>
+          <div style="max-height: 550px; overflow-y: auto; padding-right:5px;">${this._renderTabContent(ents)}</div>
         </div>`;
     }
 
     _renderTabContent(ents) {
       const c = this._config, t = this._tab;
-      const pfx = {solar:Array.from({length:10},(_,i)=>`s${i+1}`), house:Array.from({length:10},(_,i)=>`h${i+1}`), bat:Array.from({length:5},(_,i)=>`b${i+1}`), meteo:Array.from({length:5},(_,i)=>`w${i+1}`)}[t];
-      
-      if (t === 'gen') return html`<div style="display:grid; gap:10px;">Fond: <input type="text" .value="${c.background_image||''}" @input="${e=>this._up('background_image',e.target.value)}"></div>`;
-      if (t === 'flow') return html`<div>Configurez vos flux SVG ici.</div>`;
+      if (t === 'gen') return html`<div style="display:grid; gap:10px;">
+        Fond URL: <input type="text" .value="${c.background_image||''}" @input="${e=>this._up('background_image',e.target.value)}">
+        W/H Carte: <div style="display:flex;gap:5px;"><input type="number" .value="${c.card_width}" @input="${e=>this._up('card_width',e.target.value)}"><input type="number" .value="${c.card_height}" @input="${e=>this._up('card_height',e.target.value)}"></div>
+        Vitesse/Seuil Flux: <div style="display:flex;gap:5px;"><input type="number" step="0.1" .value="${c.flow_speed}" @input="${e=>this._up('flow_speed',e.target.value)}"><input type="number" .value="${c.flow_th}" @input="${e=>this._up('flow_th',e.target.value)}"></div>
+      </div>`;
 
+      if (t === 'flow') return html`${Array.from({length:20},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Flux ${i}</summary>
+        <div style="display:grid; gap:5px; margin-top:8px;">
+          SVG Path: <input type="text" .value="${c[`f${i}_p`]||''}" @input="${e=>this._up(`f${i}_p`,e.target.value)}">
+          Entité: <input list="e" .value="${c[`f${i}_s`]||''}" @input="${e=>this._up(`f${i}_s`,e.target.value)}">
+          Couleur/Ép: <div style="display:flex;gap:5px;"><input type="text" .value="${c[`f${i}_c`]||'#ff0'}" @input="${e=>this._up(`f${i}_c`,e.target.value)}"><input type="number" .value="${c[`f${i}_w`]||3}" @input="${e=>this._up(`f${i}_w`,e.target.value)}"></div>
+        </div></details>`)}<datalist id="e">${ents.map(e => html`<option value="${e}">`)}</datalist>`;
+
+      const pfx = {solar:Array.from({length:10},(_,i)=>`s${i+1}`), house:Array.from({length:10},(_,i)=>`h${i+1}`), bat:Array.from({length:5},(_,i)=>`b${i+1}`), meteo:Array.from({length:5},(_,i)=>`w${i+1}`)}[t];
       return pfx.map(p => html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Objet ${p.toUpperCase()}</summary>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
           Nom: <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
           X / Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"><input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}"></div>
-          Entité 1: <input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}">
+          
+          <div style="grid-column: span 2; background: #4caf5044; padding: 4px; border-radius: 4px; font-size: 10px; text-align: center; font-weight:bold;">STYLE & EFFET</div>
           Effet: <select style="width:100%" @change="${e=>this._up(p+'_effect',e.target.value)}">
-            <option value="halo" ?selected="${c[p+'_effect'] === 'halo'}">Halo</option>
-            <option value="pulse" ?selected="${c[p+'_effect'] === 'pulse'}">Point</option>
+            <option value="halo" ?selected="${c[p+'_effect'] === 'halo'}">Halo Tournant</option>
+            <option value="pulse" ?selected="${c[p+'_effect'] === 'pulse'}">Point Clignotant</option>
             <option value="none" ?selected="${c[p+'_effect'] === 'none'}">Aucun</option>
           </select>
+          Arrondi / Ep.Bord: <div style="display:flex;gap:2px;"><input type="number" placeholder="Radius" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}"><input type="number" placeholder="Bord" .value="${c[p+'_b_w']||2}" @input="${e=>this._up(p+'_b_w',e.target.value)}"></div>
+          Fond / Néon: <div style="display:flex;gap:2px;"><input type="text" placeholder="Fond" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}"><input type="text" placeholder="Néon" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}"></div>
+          W / H Boite: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_w_box']||120}" @input="${e=>this._up(p+'_w_box',e.target.value)}"><input type="number" .value="${c[p+'_h_box']||''}" @input="${e=>this._up(p+'_h_box',e.target.value)}"></div>
+
+          <div style="grid-column: span 2; background: #2196f344; padding: 4px; border-radius: 4px; font-size: 10px; text-align: center; font-weight:bold;">POLICES (Couleur / Taille)</div>
+          Couleur Nom / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_tc']||'#aaa'}" @input="${e=>this._up(p+'_tc',e.target.value)}"><input type="number" .value="${c[p+'_fs_l']||10}" @input="${e=>this._up(p+'_fs_l',e.target.value)}"></div>
+          Couleur V1 / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_vc']||'#fff'}" @input="${e=>this._up(p+'_vc',e.target.value)}"><input type="number" .value="${c[p+'_fs_v']||15}" @input="${e=>this._up(p+'_fs_v',e.target.value)}"></div>
+          Couleur V2 / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_v2c']||'#4caf50'}" @input="${e=>this._up(p+'_v2c',e.target.value)}"><input type="number" .value="${c[p+'_fs_v2']||12}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}"></div>
+
+          <div style="grid-column: span 2; border-top: 1px solid #444; margin: 5px 0;"></div>
+          Entités 1 / 2: <div style="display:flex;gap:2px;"><input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}"><input list="e" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}"></div>
+          Unités 1 / 2: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_u']||''}" @input="${e=>this._up(p+'_u',e.target.value)}"><input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}"></div>
+          Icone URL / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}"><input type="number" .value="${c[p+'_img_w']||35}" @input="${e=>this._up(p+'_img_w',e.target.value)}"></div>
         </div></details><datalist id="e">${ents.map(e => html`<option value="${e}">`)}</datalist>`);
     }
   }
@@ -199,5 +216,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire V240 Animated" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire V250 Total Control" });
 })();
