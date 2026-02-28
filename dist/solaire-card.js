@@ -3,6 +3,7 @@
   const html = LitElement.prototype.html;
   const css = LitElement.prototype.css;
 
+  // Dictionnaire Météo
   const METEO_DATA = {
     'clear-night': { n: 'Nuit claire', i: 'weather-night', c: '#ffeb3b', a: 'float' },
     'cloudy': { n: 'Nuageux', i: 'weather-cloudy', c: '#90a4ae', a: 'float' },
@@ -69,18 +70,42 @@
       const c = this.config;
       const keys = [];
       for(let i=1; i<=10; i++) { keys.push(`s${i}`, `h${i}`); if(i<=5) { keys.push(`b${i}`, `w${i}`); } }
+      const sparks = Array.from({length:10}, (_, i) => `sp${i+1}`); //SP1-10
+
       return html`
         <ha-card style="width:${c.card_width}px; height:${c.card_height}px; background:#000; border:none;">
           <img src="${c.background_image}" class="bg-img">
           <canvas id="flowCanvas" width="${c.card_width}" height="${c.card_height}"></canvas>
-          <div class="layer">${keys.map(p => this._renderItem(p))}</div>
+          <div class="layer">
+            ${keys.map(p => this._renderItem(p))}
+            ${sparks.map(p => this._renderSpark(p))}
+          </div>
         </ha-card>`;
+    }
+
+    _renderSpark(p) {
+        const c = this.config;
+        if (c[p + '_x'] === undefined || c[p + '_y'] === undefined) return '';
+        
+        const trigger = this.hass.states[c[p + '_ent']];
+        if (!trigger || trigger.state !== 'on') return ''; // Ne s'affiche que si l'entité est 'on'
+
+        const color = c[p+'_c'] || '#fff';
+        const size = c[p+'_w'] || 10;
+
+        return html`
+            <div class="spark-effect" style="
+                left:${c[p+'_x']}px; top:${c[p+'_y']}px;
+                width:${size}px; height:${size}px;
+                background:${color};
+                box-shadow: 0 0 ${size/2}px ${color}, 0 0 ${size}px #fff;
+            "></div>
+        `;
     }
 
     _renderItem(p) {
       const c = this.config;
       if (c[p + '_x'] === undefined || c[p + '_y'] === undefined) return '';
-      
       const s1 = this.hass.states[c[p + '_ent']];
       const s2 = this.hass.states[c[p + '_ent2']];
       let val1 = s1 ? s1.state : '0';
@@ -143,6 +168,14 @@
       .pulse-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; z-index: 20; animation: pulse-anim 1.5s infinite; }
       .pulse-rect { position: absolute; bottom: 8px; left: 8px; width: 12px; height: 4px; border-radius: 1px; z-index: 20; animation: pulse-anim 1.5s infinite; }
       
+      /* Étincelle Effet */
+      .spark-effect { position: absolute; border-radius: 50%; z-index: 30; pointer-events: none; animation: spark-flicker 0.2s infinite alternate; }
+      @keyframes spark-flicker { 
+          0% { transform: scale(1); opacity: 1; } 
+          50% { transform: scale(1.3) rotate(10deg); opacity: 0.8; }
+          100% { transform: scale(0.9) rotate(-10deg); opacity: 1; }
+      }
+
       @keyframes pulse-anim { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
       @keyframes spin { 100% { transform: rotate(360deg); } }
       @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
@@ -155,6 +188,7 @@
     `; }
   }
 
+  // --- EDITOR CODE ---
   class SolaireCardEditor extends LitElement {
     static get properties() { return { _config: {}, _tab: {type: String} }; }
     constructor() { super(); this._tab = 'gen'; }
@@ -162,12 +196,12 @@
     _up(k, v) { this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: { ...this._config, [k]: v } }, bubbles: true, composed: true })); }
 
     render() {
-      const tabs = [{id:'gen',n:'Global'},{id:'flow',n:'Câbles'},{id:'solar',n:'Panneaux'},{id:'house',n:'Charges'},{id:'bat',n:'Batteries'},{id:'meteo',n:'Météo'}];
+      const tabs = [{id:'gen',n:'Global'},{id:'flow',n:'Câbles'},{id:'solar',n:'Panneaux'},{id:'house',n:'Charges'},{id:'bat',n:'Batteries'},{id:'meteo',n:'Météo'},{id:'sparks',n:'Étincelles'}];
       const ents = Object.keys(this.hass.states).sort();
       return html`
         <div style="background:#1a1a1a; color:#eee; padding:15px; font-family:sans-serif; border-radius:8px;">
           <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:15px;">
-            ${tabs.map(t => html`<button @click="${()=>this._tab=t.id}" style="flex:1; min-width:80px; padding:10px; background:${this._tab===t.id?'#4caf50':'#333'}; border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold;">${t.n.toUpperCase()}</button>`)}
+            ${tabs.map(t => html`<button @click="${()=>this._tab=t.id}" style="flex:1; min-width:80px; padding:10px; background:${this._tab===t.id?'#4caf50':'#333'}; border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:10px; font-weight:bold; margin-bottom:2px;">${t.n.toUpperCase()}</button>`)}
           </div>
           <div style="max-height: 550px; overflow-y: auto;">${this._renderTabContent(ents)}</div>
         </div>`;
@@ -175,16 +209,27 @@
 
     _renderTabContent(ents) {
       const c = this._config, t = this._tab;
+      const entsDatalist = html`<datalist id="e">${ents.map(e => html`<option value="${e}">`)}</datalist>`;
+
       if (t === 'gen') return html`<div style="display:grid; gap:10px;">
         Fond URL: <input type="text" .value="${c.background_image||''}" @input="${e=>this._up('background_image',e.target.value)}">
         W/H Carte: <div style="display:flex;gap:5px;"><input type="number" .value="${c.card_width}" @input="${e=>this._up('card_width',e.target.value)}"><input type="number" .value="${c.card_height}" @input="${e=>this._up('card_height',e.target.value)}"></div>
       </div>`;
 
+      if (t === 'sparks') return html`${Array.from({length:10},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Étincelle ${i}</summary>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
+          Position X: <input type="number" .value="${c[`sp${i}_x`]}" @input="${e=>this._up(`sp${i}_x`,e.target.value)}">
+          Position Y: <input type="number" .value="${c[`sp${i}_y`]}" @input="${e=>this._up(`sp${i}_y`,e.target.value)}">
+          Couleur: <input type="text" placeholder="#hex ou nom" .value="${c[`sp${i}_c`]||'#fff'}" @input="${e=>this._up(`sp${i}_c`,e.target.value)}">
+          Taille (px): <input type="number" .value="${c[`sp${i}_w`]||10}" @input="${e=>this._up(`sp${i}_w`,e.target.value)}">
+          Déclencheur (on): <input list="e" .value="${c[`sp${i}_ent`]||''}" @input="${e=>this._up(`sp${i}_ent`,e.target.value)}">
+        </div></details>`)}${entsDatalist}`;
+
       if (t === 'flow') return html`${Array.from({length:20},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Flux ${i}</summary>
         <div style="display:grid; gap:5px; margin-top:8px;">
           SVG Path: <input type="text" .value="${c[`f${i}_p`]||''}" @input="${e=>this._up(`f${i}_p`,e.target.value)}">
           Entité: <input list="e" .value="${c[`f${i}_s`]||''}" @input="${e=>this._up(`f${i}_s`,e.target.value)}">
-        </div></details>`)}<datalist id="e">${ents.map(e => html`<option value="${e}">`)}</datalist>`;
+        </div></details>`)}${entsDatalist}`;
 
       const pfx = {solar:Array.from({length:10},(_,i)=>`s${i+1}`), house:Array.from({length:10},(_,i)=>`h${i+1}`), bat:Array.from({length:5},(_,i)=>`b${i+1}`), meteo:Array.from({length:5},(_,i)=>`w${i+1}`)}[t];
       return pfx.map(p => html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Objet ${p.toUpperCase()}</summary>
@@ -199,25 +244,18 @@
             <option value="rect" ?selected="${c[p+'_effect'] === 'rect'}">Voyant (Bas Gauche)</option>
             <option value="none" ?selected="${c[p+'_effect'] === 'none'}">Aucun</option>
           </select>
-          Arrondi / Ep.Bord: <div style="display:flex;gap:2px;"><input type="number" placeholder="Radius" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}"><input type="number" placeholder="Bord" .value="${c[p+'_b_w']||2}" @input="${e=>this._up(p+'_b_w',e.target.value)}"></div>
           Fond / Néon: <div style="display:flex;gap:2px;"><input type="text" placeholder="Fond" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}"><input type="text" placeholder="Néon" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}"></div>
           W / H Boite: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_w_box']||120}" @input="${e=>this._up(p+'_w_box',e.target.value)}"><input type="number" .value="${c[p+'_h_box']||''}" @input="${e=>this._up(p+'_h_box',e.target.value)}"></div>
 
-          <div style="grid-column: span 2; background: #2196f344; padding: 4px; border-radius: 4px; font-size: 10px; text-align: center; font-weight:bold;">POLICES</div>
-          C. Nom / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_tc']||'#aaa'}" @input="${e=>this._up(p+'_tc',e.target.value)}"><input type="number" .value="${c[p+'_fs_l']||10}" @input="${e=>this._up(p+'_fs_l',e.target.value)}"></div>
-          C. V1 / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_vc']||'#fff'}" @input="${e=>this._up(p+'_vc',e.target.value)}"><input type="number" .value="${c[p+'_fs_v']||15}" @input="${e=>this._up(p+'_fs_v',e.target.value)}"></div>
-          C. V2 / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_v2c']||'#4caf50'}" @input="${e=>this._up(p+'_v2c',e.target.value)}"><input type="number" .value="${c[p+'_fs_v2']||12}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}"></div>
-
           <div style="grid-column: span 2; border-top: 1px solid #444; margin: 5px 0;"></div>
           Entités 1 / 2: <div style="display:flex;gap:2px;"><input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}"><input list="e" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}"></div>
-          Unités 1 / 2: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_u']||''}" @input="${e=>this._up(p+'_u',e.target.value)}"><input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}"></div>
           Icone URL / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}"><input type="number" .value="${c[p+'_img_w']||35}" @input="${e=>this._up(p+'_img_w',e.target.value)}"></div>
-        </div></details><datalist id="e">${ents.map(e => html`<option value="${e}">`)}</datalist>`);
+        </div></details>${entsDatalist}`);
     }
   }
 
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire V260 Advanced Indicators" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire V270 Spark" });
 })();
