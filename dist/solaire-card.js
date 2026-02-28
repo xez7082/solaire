@@ -368,4 +368,11 @@ class SolaireCardEditor extends LitElement {
 
 }
 
+customElements.define("solaire-card", SolaireCard);
+
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: "solaire-card",
+  name: "Solaire Card V2 Premium"
+});
 customElements.define("solaire-card-editor", SolaireCardEditor);
