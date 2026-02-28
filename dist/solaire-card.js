@@ -1,4 +1,5 @@
 (function() {
+  // Suppression des anciennes instances si elles existent pour forcer la mise à jour
   const LitElement = Object.getPrototypeOf(customElements.get("ha-panel-lovelace")).prototype.constructor;
   const html = LitElement.prototype.html;
   const css = LitElement.prototype.css;
@@ -98,13 +99,11 @@
     _renderItem(p) {
       const c = this.config;
       if (c[p + '_x'] === undefined || c[p + '_y'] === undefined) return '';
-      
       const s1 = this.hass.states[c[p + '_ent']];
       const s2 = this.hass.states[c[p + '_ent2']];
       let val1 = s1 ? s1.state : '0';
       let weatherIcon = null;
       let weatherStyle = "";
-
       if (p.startsWith('w') && s1) {
           const rawState = val1.toLowerCase().replace(/-/g, '').replace(/_/g, '');
           const info = METEO_DATA[rawState] || METEO_DATA[val1] || { n: val1, i: 'weather-cloudy', c: '#fff', a: 'float' };
@@ -112,14 +111,11 @@
           weatherIcon = `hass:${info.i}`;
           weatherStyle = `color:${info.c}; animation: ${info.a} 3s ease-in-out infinite;`;
       }
-      
       const val2 = s2 ? s2.state : null;
       const active = Math.abs(parseFloat(val1 || 0)) > (c.flow_th || 2);
-      
       let effect = c[p+'_effect'] || 'halo';
       const bCol = c[p+'_bc'] || '#4caf50';
       const borderRadius = c[p+'_br'] !== undefined ? c[p+'_br'] : 12;
-
       return html`
         <div class="item-box ${active && effect === 'halo' ? 'animated-border' : ''}" style="
           left:${c[p+'_x']}px; top:${c[p+'_y']}px; 
@@ -129,7 +125,6 @@
         ">
           ${active && effect === 'pulse' ? html`<div class="pulse-dot" style="background:${bCol};"></div>` : ''}
           ${active && effect === 'rect' ? html`<div class="pulse-rect" style="background:${bCol};"></div>` : ''}
-
           <div class="inner-card" style="background:${c[p+'_bg'] || 'rgba(15,15,15,0.85)'}; border-radius:${borderRadius}px; border: ${effect !== 'halo' ? `${c[p+'_b_w'] || 1}px solid ${bCol}` : 'none'};">
             ${p.startsWith('b') && c[p+'_ent2'] ? html`<div class="battery-gauge"><div style="height:${val2}%; background:${val2 < 20 ? '#f44336' : '#4caf50'};"></div></div>` : ''}
             ${weatherIcon ? html`<ha-icon icon="${weatherIcon}" style="margin-right:10px; --mdc-icon-size:${c[p+'_img_w'] || 35}px; flex-shrink:0; ${weatherStyle}"></ha-icon>` : ''}
@@ -150,22 +145,17 @@
       .layer { position: absolute; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
       .item-box { position: absolute; padding: var(--border-thickness); overflow: hidden; display: flex; box-sizing: border-box; }
       .inner-card { display: flex; align-items: center; padding: 10px; width: 100%; z-index: 2; backdrop-filter: blur(5px); height: 100%; box-sizing: border-box; position: relative; }
-      
       .real-spark { position: absolute; width: var(--spark-size); height: var(--spark-size); z-index: 50; display: flex; align-items: center; justify-content: center; animation: crackle 0.15s steps(2) infinite; pointer-events: none; }
       .s-core { position: absolute; width: 30%; height: 30%; background: #fff; border-radius: 50%; box-shadow: 0 0 10px #fff, 0 0 20px var(--spark-color); }
       .s-arm { position: absolute; background: #fff; box-shadow: 0 0 5px var(--spark-color); }
       .a1, .a3 { width: 100%; height: 1px; } .a2, .a4 { width: 1px; height: 100%; }
       .a1 { transform: rotate(15deg); } .a2 { transform: rotate(75deg); } .a3 { transform: rotate(-30deg); } .a4 { transform: rotate(-60deg); }
-
       @keyframes crackle { 0% { transform: scale(0.8) rotate(0deg); opacity: 1; } 50% { transform: scale(1.4) rotate(90deg); opacity: 0.5; } 100% { transform: scale(1.1) rotate(180deg); opacity: 1; } }
       .animated-border::before { content: ''; position: absolute; z-index: 1; left: -50%; top: -50%; width: 200%; height: 200%; background-image: conic-gradient(transparent, transparent, transparent, var(--neon-color)); animation: rotate 3s linear infinite; }
       @keyframes rotate { 100% { transform: rotate(1turn); } }
       .pulse-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; z-index: 20; animation: pulse-anim 1.5s infinite; }
       .pulse-rect { position: absolute; bottom: 8px; left: 8px; width: 12px; height: 4px; border-radius: 1px; z-index: 20; animation: pulse-anim 1.5s infinite; }
       @keyframes pulse-anim { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
-      @keyframes spin { 100% { transform: rotate(360deg); } }
-      @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
       .content { flex-grow: 1; text-align: center; display: flex; flex-direction: column; justify-content: center; overflow: hidden; z-index: 3; }
       .label { font-weight: bold; text-transform: uppercase; white-space: nowrap; }
       .value { font-weight: 900; line-height: 1.1; }
@@ -178,7 +168,6 @@
     constructor() { super(); this._tab = 'gen'; }
     setConfig(config) { this._config = config; }
     _up(k, v) { this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: { ...this._config, [k]: v } }, bubbles: true, composed: true })); }
-
     render() {
       const tabs = [{id:'gen',n:'Global'},{id:'flow',n:'Câbles'},{id:'solar',n:'Panneaux'},{id:'house',n:'Charges'},{id:'bat',n:'Batteries'},{id:'meteo',n:'Météo'},{id:'sparks',n:'Étincelles'}];
       const ents = Object.keys(this.hass.states).sort();
@@ -190,61 +179,18 @@
           <div style="max-height: 550px; overflow-y: auto;">${this._renderTabContent(ents)}</div>
         </div>`;
     }
-
     _renderTabContent(ents) {
       const c = this._config, t = this._tab;
       const datalist = html`<datalist id="e">${ents.map(e => html`<option value="${e}">`)}</datalist>`;
-
-      if (t === 'gen') return html`<div style="display:grid; gap:10px;">
-        Fond URL: <input type="text" .value="${c.background_image||''}" @input="${e=>this._up('background_image',e.target.value)}">
-        W/H Carte: <div style="display:flex;gap:5px;"><input type="number" .value="${c.card_width}" @input="${e=>this._up('card_width',e.target.value)}"><input type="number" .value="${c.card_height}" @input="${e=>this._up('card_height',e.target.value)}"></div>
-        Vitesse/Seuil Flux: <div style="display:flex;gap:5px;"><input type="number" step="0.1" .value="${c.flow_speed}" @input="${e=>this._up('flow_speed',e.target.value)}"><input type="number" .value="${c.flow_th}" @input="${e=>this._up('flow_th',e.target.value)}"></div>
-      </div>`;
-
-      if (t === 'sparks') return html`${Array.from({length:10},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Étincelle ${i}</summary>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
-          X/Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[`sp${i}_x`]}" @input="${e=>this._up(`sp${i}_x`,e.target.value)}"><input type="number" .value="${c[`sp${i}_y`]}" @input="${e=>this._up(`sp${i}_y`,e.target.value)}"></div>
-          Couleur: <input type="text" .value="${c[`sp${i}_c`]||'#4fc3f7'}" @input="${e=>this._up(`sp${i}_c`,e.target.value)}">
-          Taille: <input type="number" .value="${c[`sp${i}_w`]||15}" @input="${e=>this._up(`sp${i}_w`,e.target.value)}">
-          Déclencheur (on): <input list="e" .value="${c[`sp${i}_ent`]||''}" @input="${e=>this._up(`sp${i}_ent`,e.target.value)}">
-        </div></details>`)}${datalist}`;
-
-      if (t === 'flow') return html`${Array.from({length:20},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Câble/Flux ${i}</summary>
-        <div style="display:grid; gap:5px; margin-top:8px;">
-          SVG Path: <input type="text" .value="${c[`f${i}_p`]||''}" @input="${e=>this._up(`f${i}_p`,e.target.value)}">
-          Entité: <input list="e" .value="${c[`f${i}_s`]||''}" @input="${e=>this._up(`f${i}_s`,e.target.value)}">
-          Coul/Ep: <div style="display:flex;gap:5px;"><input type="text" .value="${c[`f${i}_c`]||'#ff0'}" @input="${e=>this._up(`f${i}_c`,e.target.value)}"><input type="number" .value="${c[`f${i}_w`]||3}" @input="${e=>this._up(`f${i}_w`,e.target.value)}"></div>
-        </div></details>`)}${datalist}`;
-
+      if (t === 'gen') return html`<div style="display:grid; gap:10px;">Fond: <input type="text" .value="${c.background_image||''}" @input="${e=>this._up('background_image',e.target.value)}"> W/H: <div style="display:flex;gap:5px;"><input type="number" .value="${c.card_width}" @input="${e=>this._up('card_width',e.target.value)}"><input type="number" .value="${c.card_height}" @input="${e=>this._up('card_height',e.target.value)}"></div></div>`;
+      if (t === 'sparks') return html`${Array.from({length:10},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Étincelle ${i}</summary><div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">X/Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[`sp${i}_x`]}" @input="${e=>this._up(`sp${i}_x`,e.target.value)}"><input type="number" .value="${c[`sp${i}_y`]}" @input="${e=>this._up(`sp${i}_y`,e.target.value)}"></div> Couleur: <input type="text" .value="${c[`sp${i}_c`]||'#4fc3f7'}" @input="${e=>this._up(`sp${i}_c`,e.target.value)}"> Taille: <input type="number" .value="${c[`sp${i}_w`]||15}" @input="${e=>this._up(`sp${i}_w`,e.target.value)}"> Déclencheur: <input list="e" .value="${c[`sp${i}_ent`]||''}" @input="${e=>this._up(`sp${i}_ent`,e.target.value)}"></div></details>`)}${datalist}`;
+      if (t === 'flow') return html`${Array.from({length:20},(_,i)=>i+1).map(i=>html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Câble ${i}</summary><div style="display:grid; gap:5px; margin-top:8px;">Path: <input type="text" .value="${c[`f${i}_p`]||''}" @input="${e=>this._up(`f${i}_p`,e.target.value)}"> Entité: <input list="e" .value="${c[`f${i}_s`]||''}" @input="${e=>this._up(`f${i}_s`,e.target.value)}"> Coul/Ep: <div style="display:flex;gap:5px;"><input type="text" .value="${c[`f${i}_c`]||'#ff0'}" @input="${e=>this._up(`f${i}_c`,e.target.value)}"><input type="number" .value="${c[`f${i}_w`]||3}" @input="${e=>this._up(`f${i}_w`,e.target.value)}"></div></div></details>`)}${datalist}`;
       const pfx = {solar:Array.from({length:10},(_,i)=>`s${i+1}`), house:Array.from({length:10},(_,i)=>`h${i+1}`), bat:Array.from({length:5},(_,i)=>`b${i+1}`), meteo:Array.from({length:5},(_,i)=>`w${i+1}`)}[t];
-      return pfx.map(p => html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Objet ${p.toUpperCase()}</summary>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
-          Nom: <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
-          X / Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"><input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}"></div>
-          Effet: <select @change="${e=>this._up(p+'_effect',e.target.value)}">
-            <option value="halo" ?selected="${c[p+'_effect'] === 'halo'}">Halo Tournant</option>
-            <option value="pulse" ?selected="${c[p+'_effect'] === 'pulse'}">Point (Haut Droite)</option>
-            <option value="rect" ?selected="${c[p+'_effect'] === 'rect'}">Voyant (Bas Gauche)</option>
-            <option value="none" ?selected="${c[p+'_effect'] === 'none'}">Aucun</option>
-          </select>
-          Rayon/Bord: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}"><input type="number" .value="${c[p+'_b_w']||2}" @input="${e=>this._up(p+'_b_w',e.target.value)}"></div>
-          Coul Fond/Néon: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}"><input type="text" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}"></div>
-          W/H Box: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_w_box']||120}" @input="${e=>this._up(p+'_w_box',e.target.value)}"><input type="number" .value="${c[p+'_h_box']||''}" @input="${e=>this._up(p+'_h_box',e.target.value)}"></div>
-          
-          <div style="grid-column: span 2; background: #2196f344; padding: 4px; border-radius: 4px; font-size: 10px; text-align: center; font-weight:bold;">POLICES</div>
-          C. Nom / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_tc']||'#aaa'}" @input="${e=>this._up(p+'_tc',e.target.value)}"><input type="number" .value="${c[p+'_fs_l']||10}" @input="${e=>this._up(p+'_fs_l',e.target.value)}"></div>
-          C. V1 / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_vc']||'#fff'}" @input="${e=>this._up(p+'_vc',e.target.value)}"><input type="number" .value="${c[p+'_fs_v']||15}" @input="${e=>this._up(p+'_fs_v',e.target.value)}"></div>
-          C. V2 / Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_v2c']||'#4caf50'}" @input="${e=>this._up(p+'_v2c',e.target.value)}"><input type="number" .value="${c[p+'_fs_v2']||12}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}"></div>
-
-          Entité 1/2: <div style="display:flex;gap:2px;"><input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}"><input list="e" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}"></div>
-          Unité 1/2: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_u']||''}" @input="${e=>this._up(p+'_u',e.target.value)}"><input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}"></div>
-          Icone/Taille: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}"><input type="number" .value="${c[p+'_img_w']||35}" @input="${e=>this._up(p+'_img_w',e.target.value)}"></div>
-        </div></details>${datalist}`;
+      return pfx.map(p => html`<details style="background:#222; margin-bottom:5px; padding:8px; border-radius:4px;"><summary>Objet ${p.toUpperCase()}</summary><div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">Nom: <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}"> X/Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"><input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}"></div> Effet: <select @change="${e=>this._up(p+'_effect',e.target.value)}"><option value="halo" ?selected="${c[p+'_effect']==='halo'}">Halo</option><option value="pulse" ?selected="${c[p+'_effect']==='pulse'}">Point</option><option value="rect" ?selected="${c[p+'_effect']==='rect'}">Voyant</option><option value="none" ?selected="${c[p+'_effect']==='none'}">Aucun</option></select> Fond/Néon: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}"><input type="text" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}"></div> W/H Box: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_w_box']||120}" @input="${e=>this._up(p+'_w_box',e.target.value)}"><input type="number" .value="${c[p+'_h_box']||''}" @input="${e=>this._up(p+'_h_box',e.target.value)}"></div> <div style="grid-column: span 2; background: #2196f344; padding: 4px; font-size: 10px; text-align: center;">POLICES</div> Nom: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_tc']||'#aaa'}" @input="${e=>this._up(p+'_tc',e.target.value)}"><input type="number" .value="${c[p+'_fs_l']||10}" @input="${e=>this._up(p+'_fs_l',e.target.value)}"></div> V1: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_vc']||'#fff'}" @input="${e=>this._up(p+'_vc',e.target.value)}"><input type="number" .value="${c[p+'_fs_v']||15}" @input="${e=>this._up(p+'_fs_v',e.target.value)}"></div> V2: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_v2c']||'#4caf50'}" @input="${e=>this._up(p+'_v2c',e.target.value)}"><input type="number" .value="${c[p+'_fs_v2']||12}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}"></div> Entités: <div style="display:flex;gap:2px;"><input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}"><input list="e" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}"></div> Unités: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_u']||''}" @input="${e=>this._up(p+'_u',e.target.value)}"><input type="text" .value="${c[p+'_u2']||''}" @input="${e=>this._up(p+'_u2',e.target.value)}"></div> Icone: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_img']||''}" @input="${e=>this._up(p+'_img',e.target.value)}"><input type="number" .value="${c[p+'_img_w']||35}" @input="${e=>this._up(p+'_img_w',e.target.value)}"></div></div></details>${datalist}`);
     }
   }
 
-  customElements.define("solaire-card-editor", SolaireCardEditor);
-  customElements.define("solaire-card", SolaireCard);
-  window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire V290 La Totale" });
+  // Double enregistrement pour être sûr
+  if (!customElements.get("solaire-card-editor")) customElements.define("solaire-card-editor", SolaireCardEditor);
+  if (!customElements.get("solaire-card")) customElements.define("solaire-card", SolaireCard);
 })();
