@@ -15,7 +15,7 @@
     static get properties(){ return { hass:{}, config:{} }; }
 
     setConfig(config){
-      this.config = { card_width:1540, card_height:580, flow_speed:3, flow_th:2, ...config };
+      this.config={ card_width:1540, card_height:580, flow_speed:3, flow_th:2, ...config };
     }
 
     static getConfigElement(){
@@ -45,7 +45,6 @@
       if(this._offset>1000||this._offset<-1000) this._offset=0;
 
       this._draw();
-
       this._f=requestAnimationFrame(()=>this._run());
     }
 
@@ -103,7 +102,6 @@
             const pt=tempPath.getPointAtLength(trailPos);
 
             ctx.globalAlpha=(1-t/6)*flicker;
-
             ctx.shadowBlur=(c[`f${i}_w`]||4)*6;
             ctx.shadowColor=color;
 
@@ -164,6 +162,9 @@
 
       const isProduction=!p.startsWith('w')&&parseFloat(val1)>0;
 
+      const textColor=c[p+'_tc']||'#aaa';
+      const valueColor=c[p+'_vc']||'#fff';
+
       const bCol=c[p+'_bc']||'#4caf50';
       const isTransBorder=bCol==='transparent'||bCol==='none';
 
@@ -199,12 +200,12 @@
                 :''}
 
               <div class="label"
-                style="color:${c[p+'_tc']||'#aaa'};font-size:${c[p+'_fs_l']||10}px;">
+                style="color:${textColor};font-size:${c[p+'_fs_l']||10}px;">
                 ${c[p+'_name']||''}
               </div>
 
               <div class="value"
-                style="color:${c[p+'_vc']||'#fff'};font-size:${c[p+'_fs_v']||15}px;">
+                style="color:${valueColor};font-size:${c[p+'_fs_v']||15}px;">
                 ${val1}${c[p+'_u']||''}
               </div>
 
@@ -223,7 +224,6 @@
 
     static get styles(){
       return css`
-
       ha-card{
         position:relative;
         overflow:hidden;
@@ -297,7 +297,6 @@
         from{opacity:1;}
         to{opacity:0.3;}
       }
-
       `;
     }
   }
@@ -337,29 +336,29 @@
       const ents=Object.keys(this.hass?.states||{}).sort();
 
       return html`
-        <div style="background:#1a1a1a;color:#eee;padding:15px;font-family:sans-serif;">
+      <div style="background:#1a1a1a;color:#eee;padding:15px;font-family:sans-serif;">
 
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:15px;">
-            ${tabs.map(t=>html`
-              <button @click=${()=>this._tab=t.id}
-                style="flex:1;min-width:80px;padding:10px;
-                background:${this._tab===t.id?'#4caf50':'#333'};
-                border:none;color:#fff;border-radius:4px;
-                cursor:pointer;font-size:10px;font-weight:bold;">
-                ${t.n.toUpperCase()}
-              </button>
-            `)}
-          </div>
-
-          <div style="max-height:550px;overflow-y:auto">
-            ${this._renderTabContent(ents)}
-          </div>
-
-          <datalist id="e">
-            ${ents.map(e=>html`<option value="${e}">`)}
-          </datalist>
-
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:15px;">
+          ${tabs.map(t=>html`
+          <button @click=${()=>this._tab=t.id}
+            style="flex:1;min-width:80px;padding:10px;
+            background:${this._tab===t.id?'#4caf50':'#333'};
+            border:none;color:#fff;border-radius:4px;
+            cursor:pointer;font-size:10px;font-weight:bold;">
+            ${t.n.toUpperCase()}
+          </button>
+          `)}
         </div>
+
+        <div style="max-height:550px;overflow-y:auto">
+          ${this._renderTabContent(ents)}
+        </div>
+
+        <datalist id="e">
+          ${ents.map(e=>html`<option value="${e}">`)}
+        </datalist>
+
+      </div>
       `;
     }
 
@@ -369,41 +368,41 @@
       const t=this._tab;
 
       if(t==='gen') return html`
-        <div style="display:grid;gap:10px;">
-          Fond URL:
-          <input type="text"
-            .value=${c.background_image||''}
-            @input=${e=>this._up('background_image',e.target.value)}>
+      <div style="display:grid;gap:10px;">
+        Fond URL:
+        <input type="text"
+          .value=${c.background_image||''}
+          @input=${e=>this._up('background_image',e.target.value)}>
 
-          W/H Carte:
-          <div style="display:flex;gap:5px;">
-            <input type="number"
-              .value=${c.card_width}
-              @input=${e=>this._up('card_width',e.target.value)}>
+        W/H Carte:
+        <div style="display:flex;gap:5px;">
+          <input type="number"
+            .value=${c.card_width}
+            @input=${e=>this._up('card_width',e.target.value)}>
 
-            <input type="number"
-              .value=${c.card_height}
-              @input=${e=>this._up('card_height',e.target.value)}>
-          </div>
+          <input type="number"
+            .value=${c.card_height}
+            @input=${e=>this._up('card_height',e.target.value)}>
         </div>
+      </div>
       `;
 
       if(t==='flow') return html`
-        ${Array.from({length:20},(_,i)=>i+1).map(i=>html`
-          <details style="background:#222;margin-bottom:5px;padding:8px;">
-            <summary>Flux ${i}</summary>
+      ${Array.from({length:20},(_,i)=>i+1).map(i=>html`
+        <details style="background:#222;margin-bottom:5px;padding:8px;">
+          <summary>Flux ${i}</summary>
 
-            Path SVG:
-            <input style="width:100%" list="e"
-              .value=${c[`f${i}_p`]||''}
-              @input=${e=>this._up(`f${i}_p`,e.target.value)}>
+          Path SVG:
+          <input style="width:100%" list="e"
+            .value=${c[`f${i}_p`]||''}
+            @input=${e=>this._up(`f${i}_p`,e.target.value)}>
 
-            Entité:
-            <input list="e"
-              .value=${c[`f${i}_s`]||''}
-              @input=${e=>this._up(`f${i}_s`,e.target.value)}>
-          </details>
-        `)}
+          Entité:
+          <input list="e"
+            .value=${c[`f${i}_s`]||''}
+            @input=${e=>this._up(`f${i}_s`,e.target.value)}>
+        </details>
+      `)}
       `;
 
       const pfx={
@@ -414,90 +413,100 @@
       }[t];
 
       return pfx.map(p=>html`
-        <details style="background:#222;margin-bottom:5px;padding:8px;border-radius:4px;">
-          <summary>Objet ${p.toUpperCase()}</summary>
+      <details style="background:#222;margin-bottom:5px;padding:8px;border-radius:4px;">
+        <summary>Objet ${p.toUpperCase()}</summary>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
 
-            Nom:
-            <input type="text"
-              .value=${c[p+'_name']||''}
-              @input=${e=>this._up(p+'_name',e.target.value)}>
+        Nom:
+        <input type="text"
+          .value=${c[p+'_name']||''}
+          @input=${e=>this._up(p+'_name',e.target.value)}>
 
-            X / Y:
-            <div style="display:flex;gap:2px;">
-              <input type="number"
-                .value=${c[p+'_x']}
-                @input=${e=>this._up(p+'_x',e.target.value)}>
+        Couleur Texte:
+        <input type="color"
+          .value=${c[p+'_tc']||'#aaa'}
+          @input=${e=>this._up(p+'_tc',e.target.value)}>
 
-              <input type="number"
-                .value=${c[p+'_y']}
-                @input=${e=>this._up(p+'_y',e.target.value)}>
-            </div>
+        Couleur Valeur:
+        <input type="color"
+          .value=${c[p+'_vc']||'#ffffff'}
+          @input=${e=>this._up(p+'_vc',e.target.value)}>
 
-            Taille Police:
-            <div style="display:flex;gap:2px;">
-              <input type="number" .value=${c[p+'_fs_l']||10}
-                @input=${e=>this._up(p+'_fs_l',e.target.value)}>
+        X / Y:
+        <div style="display:flex;gap:2px;">
+          <input type="number"
+            .value=${c[p+'_x']}
+            @input=${e=>this._up(p+'_x',e.target.value)}>
 
-              <input type="number" .value=${c[p+'_fs_v']||15}
-                @input=${e=>this._up(p+'_fs_v',e.target.value)}>
+          <input type="number"
+            .value=${c[p+'_y']}
+            @input=${e=>this._up(p+'_y',e.target.value)}>
+        </div>
 
-              <input type="number" .value=${c[p+'_fs_v2']||12}
-                @input=${e=>this._up(p+'_fs_v2',e.target.value)}>
-            </div>
+        Taille Police:
+        <div style="display:flex;gap:2px;">
+          <input type="number" .value=${c[p+'_fs_l']||10}
+            @input=${e=>this._up(p+'_fs_l',e.target.value)}>
 
-            W / H Boite:
-            <div style="display:flex;gap:2px;">
-              <input type="number"
-                .value=${c[p+'_w_box']||120}
-                @input=${e=>this._up(p+'_w_box',e.target.value)}>
+          <input type="number" .value=${c[p+'_fs_v']||15}
+            @input=${e=>this._up(p+'_fs_v',e.target.value)}>
 
-              <input type="number"
-                .value=${c[p+'_h_box']||''}
-                @input=${e=>this._up(p+'_h_box',e.target.value)}>
-            </div>
+          <input type="number" .value=${c[p+'_fs_v2']||12}
+            @input=${e=>this._up(p+'_fs_v2',e.target.value)}>
+        </div>
 
-            Entité 1 / 2:
-            <div style="display:flex;gap:2px;">
-              <input list="e"
-                .value=${c[p+'_ent']||''}
-                @input=${e=>this._up(p+'_ent',e.target.value)}>
+        W / H Boite:
+        <div style="display:flex;gap:2px;">
+          <input type="number"
+            .value=${c[p+'_w_box']||120}
+            @input=${e=>this._up(p+'_w_box',e.target.value)}>
 
-              <input list="e"
-                .value=${c[p+'_ent2']||''}
-                @input=${e=>this._up(p+'_ent2',e.target.value)}>
-            </div>
+          <input type="number"
+            .value=${c[p+'_h_box']||''}
+            @input=${e=>this._up(p+'_h_box',e.target.value)}>
+        </div>
 
-            Unités:
-            <div style="display:flex;gap:2px;">
-              <input type="text"
-                .value=${c[p+'_u']||''}
-                @input=${e=>this._up(p+'_u',e.target.value)}>
+        Entité 1 / 2:
+        <div style="display:flex;gap:2px;">
+          <input list="e"
+            .value=${c[p+'_ent']||''}
+            @input=${e=>this._up(p+'_ent',e.target.value)}>
 
-              <input type="text"
-                .value=${c[p+'_u2']||''}
-                @input=${e=>this._up(p+'_u2',e.target.value)}>
-            </div>
+          <input list="e"
+            .value=${c[p+'_ent2']||''}
+            @input=${e=>this._up(p+'_ent2',e.target.value)}>
+        </div>
 
-            Fond / Néon:
-            <div style="display:flex;gap:2px;">
-              <input type="text" placeholder="Fond"
-                .value=${c[p+'_bg']||''}
-                @input=${e=>this._up(p+'_bg',e.target.value)}>
+        Unités:
+        <div style="display:flex;gap:2px;">
+          <input type="text"
+            .value=${c[p+'_u']||''}
+            @input=${e=>this._up(p+'_u',e.target.value)}>
 
-              <input type="text" placeholder="Néon"
-                .value=${c[p+'_bc']||''}
-                @input=${e=>this._up(p+'_bc',e.target.value)}>
-            </div>
+          <input type="text"
+            .value=${c[p+'_u2']||''}
+            @input=${e=>this._up(p+'_u2',e.target.value)}>
+        </div>
 
-            Taille Icône:
-            <input type="number"
-              .value=${c[p+'_img_w']||35}
-              @input=${e=>this._up(p+'_img_w',e.target.value)}>
+        Fond / Néon:
+        <div style="display:flex;gap:2px;">
+          <input type="text" placeholder="Fond"
+            .value=${c[p+'_bg']||''}
+            @input=${e=>this._up(p+'_bg',e.target.value)}>
 
-          </div>
-        </details>
+          <input type="text" placeholder="Néon"
+            .value=${c[p+'_bc']||''}
+            @input=${e=>this._up(p+'_bc',e.target.value)}>
+        </div>
+
+        Taille Icône:
+        <input type="number"
+          .value=${c[p+'_img_w']||35}
+          @input=${e=>this._up(p+'_img_w',e.target.value)}>
+
+        </div>
+      </details>
       `);
     }
   }
