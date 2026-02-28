@@ -3,8 +3,6 @@ class SolaireCard extends HTMLElement {
   constructor(){
     super();
     this._raf=null;
-    this._energyMap=new Map();
-    this._frameTime=0;
   }
 
   setConfig(config){
@@ -25,13 +23,9 @@ class SolaireCard extends HTMLElement {
     cancelAnimationFrame(this._raf);
   }
 
-  /* =========================
-     SMOOTH ENERGY ENGINE
-  ========================= */
-
-  _lerp(a,b,t){
-    return a+(b-a)*t;
-  }
+  /* ===============================
+     ANIMATION SAFE LOOP
+  =============================== */
 
   _animate(){
 
@@ -42,10 +36,6 @@ class SolaireCard extends HTMLElement {
       const ctx=canvas.getContext("2d");
       const c=this._config||{};
 
-      const now=performance.now();
-      const dt=Math.min((now-this._frameTime)/16,1);
-      this._frameTime=now;
-
       ctx.clearRect(0,0,canvas.width,canvas.height);
 
       for(let i=1;i<=20;i++){
@@ -55,15 +45,11 @@ class SolaireCard extends HTMLElement {
 
         if(!path || !entity) continue;
 
-        const state=parseFloat(this._hass.states[entity]?.state)||0;
+        const state=parseFloat(
+          this._hass.states[entity]?.state
+        )||0;
 
-        const prev=this._energyMap.get(i)||0;
-        const smooth=this._lerp(prev,state,0.08);
-
-        this._energyMap.set(i,smooth);
-
-        const glow=Math.min(Math.abs(smooth)/1000,1)*25+6;
-        const color=smooth>=0 ? "#00ff88" : "#ff4444";
+        const color=state>=0 ? "#00ff88" : "#ff4444";
 
         try{
 
@@ -73,9 +59,9 @@ class SolaireCard extends HTMLElement {
 
           ctx.strokeStyle=color;
           ctx.lineWidth=3;
-          ctx.shadowBlur=glow;
+          ctx.shadowBlur=12;
           ctx.shadowColor=color;
-          ctx.globalAlpha=0.95;
+          ctx.globalAlpha=0.9;
 
           ctx.stroke(svgPath);
 
@@ -88,9 +74,9 @@ class SolaireCard extends HTMLElement {
     this._raf=requestAnimationFrame(()=>this._animate());
   }
 
-  /* =========================
-     RENDER CORE
-  ========================= */
+  /* ===============================
+     RENDER CARD
+  =============================== */
 
   _render(){
 
@@ -107,9 +93,9 @@ class SolaireCard extends HTMLElement {
       height:${height}px;
       position:relative;
       overflow:hidden;
-      border-radius:22px;
+      border-radius:18px;
       background:black;
-      box-shadow:0 0 50px rgba(0,255,136,.12);
+      --ha-card-background:transparent !important;
     ">
 
       <img src="${c.background_image||''}"
@@ -122,17 +108,14 @@ class SolaireCard extends HTMLElement {
 
       <canvas width="${width}"
               height="${height}"
-              style="
-              position:absolute;
-              z-index:5;
-              pointer-events:none">
+              style="position:absolute;z-index:5">
       </canvas>
 
       <div style="
         position:absolute;
         inset:0;
-        backdrop-filter:blur(18px);
-        background:rgba(0,0,0,.38);
+        backdrop-filter:blur(10px);
+        background:rgba(0,0,0,.35);
         z-index:8;
       "></div>
 
@@ -148,9 +131,9 @@ class SolaireCard extends HTMLElement {
     `;
   }
 
-  /* =========================
+  /* ===============================
      OBJECT RENDERER
-  ========================= */
+  =============================== */
 
   _renderObjects(){
 
@@ -169,9 +152,6 @@ class SolaireCard extends HTMLElement {
       const state=hass.states[entity];
       if(!state) continue;
 
-      const textColor=c[`s${i}_tc`]||"#aaa";
-      const valueColor=c[`s${i}_vc`]||"#fff";
-
       html+=`
       <div style="
         position:absolute;
@@ -179,24 +159,23 @@ class SolaireCard extends HTMLElement {
         top:${c[`s${i}_y`]||0}px;
         width:${c[`s${i}_w_box`]||120}px;
         height:${c[`s${i}_h_box`]||60}px;
-        backdrop-filter:blur(14px);
-        background:rgba(25,25,25,.55);
-        border-radius:16px;
+        backdrop-filter:blur(12px);
+        background:rgba(20,20,20,.55);
+        border-radius:14px;
         padding:8px;
         text-align:center;
         z-index:20;
-        transition:transform .2s;
       ">
 
         <div style="
-          color:${textColor};
+          color:${c[`s${i}_tc`]||"#aaa"};
           font-size:${c[`s${i}_fs_l`]||10}px;
         ">
           ${c[`s${i}_name`]||""}
         </div>
 
         <div style="
-          color:${valueColor};
+          color:${c[`s${i}_vc`]||"#fff"};
           font-size:${c[`s${i}_fs_v`]||16}px;
           font-weight:900;
         ">
@@ -211,15 +190,46 @@ class SolaireCard extends HTMLElement {
   }
 }
 
-/* =========================
-   REGISTER CARD
-========================= */
+/* ===============================
+   EDITOR VISUAL SIMPLE
+=============================== */
+
+class SolaireCardEditor extends HTMLElement {
+
+  setConfig(config){
+    this._config=config;
+    this._render();
+  }
+
+  _render(){
+
+    const c=this._config||{};
+
+    this.innerHTML=`
+    <div style="padding:16px;background:#111;color:white;border-radius:14px;font-family:sans-serif">
+
+      <h3 style="margin-top:0">Éditeur Solaire</h3>
+
+      Fond image
+      <input style="width:100%"
+        value="${c.background_image||""}"
+        oninput="this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:{...${JSON.stringify(c)},background_image:this.value}},bubbles:true,composed:true}))">
+
+    </div>
+    `;
+  }
+}
+
+/* ===============================
+   REGISTER COMPONENT
+=============================== */
 
 customElements.define("solaire-card", SolaireCard);
+customElements.define("solaire-card-editor", SolaireCardEditor);
 
 window.customCards = window.customCards || [];
 
 window.customCards.push({
   type:"solaire-card",
-  name:"Solaire Card Absolute God Mode"
+  name:"Solaire Card V5 Pro Stable"
 });
