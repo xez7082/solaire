@@ -75,7 +75,6 @@
       
       const s1 = this.hass.states[c[p + '_ent']];
       const s2 = this.hass.states[c[p + '_ent2']];
-      
       let val1 = s1 ? s1.state : '0';
       let iconMeteo = null;
 
@@ -86,21 +85,33 @@
       }
       
       const val2 = s2 ? s2.state : null;
-      const isActive = p.startsWith('w') ? false : (Math.abs(parseFloat(val1)) > (c.flow_th || 2));
+      const vNum = Math.abs(parseFloat(val1));
+      const active = vNum > (c.flow_th || 2);
+      
+      // Logique d'effet
+      let effect = c[p+'_effect'] || 'halo';
+      if(p.startsWith('s')) effect = 'halo';
+      if(p.startsWith('b')) effect = 'pulse';
+
       const bCol = c[p+'_bc'] || '#4caf50';
       const isTransBorder = bCol === 'transparent' || bCol === 'none';
       const borderRadius = c[p+'_br'] !== undefined ? c[p+'_br'] : 12;
 
       return html`
-        <div class="item-box ${isActive && !isTransBorder ? 'animated-border' : ''}" style="
+        <div class="item-box ${active && effect === 'halo' && !isTransBorder ? 'animated-border' : ''}" style="
           left:${c[p+'_x']}px; top:${c[p+'_y']}px; 
           width:${c[p+'_w_box'] || 120}px; height:${c[p+'_h_box'] || 'auto'}px;
           --neon-color:${bCol}; 
-          --border-thickness:${isTransBorder ? 0 : (c[p+'_b_w'] || 2)}px;
+          --border-thickness:${(effect === 'halo' && !isTransBorder) ? (c[p+'_b_w'] || 2) : 0}px;
           border-radius:${borderRadius}px;
         ">
-          <div class="inner-card" style="background:${c[p+'_bg'] || 'rgba(15,15,15,0.85)'}; border-radius:${borderRadius}px;">
-            
+          ${active && effect === 'pulse' ? html`<div class="pulse-dot" style="background:${bCol}; box-shadow: 0 0 10px ${bCol};"></div>` : ''}
+          
+          <div class="inner-card" style="
+            background:${c[p+'_bg'] || 'rgba(15,15,15,0.85)'}; 
+            border-radius:${borderRadius}px;
+            border: ${effect !== 'halo' && !isTransBorder ? `${c[p+'_b_w'] || 1}px solid ${bCol}` : 'none'};
+          ">
             ${p.startsWith('b') && c[p+'_ent2'] ? html`
               <div class="battery-gauge"><div style="height:${val2}%; background:${val2 < 20 ? '#f44336' : '#4caf50'};"></div></div>
             ` : ''}
@@ -125,10 +136,17 @@
       #flowCanvas { position: absolute; z-index: 5; pointer-events: none; }
       .layer { position: absolute; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
       .item-box { position: absolute; padding: var(--border-thickness); overflow: hidden; pointer-events: auto; display: flex; box-sizing: border-box; }
-      .inner-card { display: flex; align-items: center; padding: 10px; width: 100%; z-index: 2; backdrop-filter: blur(5px); height: 100%; box-sizing: border-box; }
+      .inner-card { display: flex; align-items: center; padding: 10px; width: 100%; z-index: 2; backdrop-filter: blur(5px); height: 100%; box-sizing: border-box; position: relative; }
+      
+      /* Animation HALO */
       .animated-border::before { content: ''; position: absolute; z-index: 1; left: -50%; top: -50%; width: 200%; height: 200%; background-image: conic-gradient(transparent, transparent, transparent, var(--neon-color)); animation: rotate 3s linear infinite; }
       @keyframes rotate { 100% { transform: rotate(1turn); } }
-      .content { flex-grow: 1; text-align: center; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+      
+      /* Animation PULSE (Point) */
+      .pulse-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; z-index: 20; animation: pulse-anim 1.5s infinite; }
+      @keyframes pulse-anim { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+      
+      .content { flex-grow: 1; text-align: center; display: flex; flex-direction: column; justify-content: center; overflow: hidden; z-index: 3; }
       .label { font-weight: bold; text-transform: uppercase; white-space: nowrap; }
       .value { font-weight: 900; line-height: 1.1; }
       .battery-gauge { width: 8px; height: 100%; min-height: 35px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); margin-right: 8px; display: flex; flex-direction: column-reverse; overflow: hidden; border-radius: 2px; flex-shrink: 0; }
@@ -171,15 +189,19 @@
           Nom: <input type="text" .value="${c[p+'_name']||''}" @input="${e=>this._up(p+'_name',e.target.value)}">
           X / Y: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_x']}" @input="${e=>this._up(p+'_x',e.target.value)}"><input type="number" .value="${c[p+'_y']}" @input="${e=>this._up(p+'_y',e.target.value)}"></div>
           
-          <div style="grid-column: span 2; background: #333; padding: 4px; border-radius: 4px; font-size: 10px; text-align: center;">TEXTES (Couleur / Taille)</div>
-          Nom: <div style="display:flex;gap:2px;"><input type="text" placeholder="#color" .value="${c[p+'_tc']||'#aaa'}" @input="${e=>this._up(p+'_tc',e.target.value)}"><input type="number" .value="${c[p+'_fs_l']||10}" @input="${e=>this._up(p+'_fs_l',e.target.value)}"></div>
-          Val 1: <div style="display:flex;gap:2px;"><input type="text" placeholder="#color" .value="${c[p+'_vc']||'#fff'}" @input="${e=>this._up(p+'_vc',e.target.value)}"><input type="number" .value="${c[p+'_fs_v']||15}" @input="${e=>this._up(p+'_fs_v',e.target.value)}"></div>
-          Val 2: <div style="display:flex;gap:2px;"><input type="text" placeholder="#color" .value="${c[p+'_v2c']||'#4caf50'}" @input="${e=>this._up(p+'_v2c',e.target.value)}"><input type="number" .value="${c[p+'_fs_v2']||12}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}"></div>
+          <div style="grid-column: span 2; background: #333; padding: 4px; border-radius: 4px; font-size: 10px; text-align: center;">STYLE & EFFET</div>
+          Effet: <select style="width:100%" @change="${e=>this._up(p+'_effect',e.target.value)}">
+            <option value="halo" ?selected="${c[p+'_effect'] === 'halo'}">Halo Tournant (Solaire)</option>
+            <option value="pulse" ?selected="${c[p+'_effect'] === 'pulse'}">Point Clignotant (Batterie)</option>
+            <option value="none" ?selected="${c[p+'_effect'] === 'none'}">Aucun</option>
+          </select>
+          Arrondi / Ep: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}"><input type="number" .value="${c[p+'_b_w']||2}" @input="${e=>this._up(p+'_b_w',e.target.value)}"></div>
+          Fond / Néon: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}"><input type="text" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}"></div>
           
-          <div style="grid-column: span 2; background: #333; padding: 4px; border-radius: 4px; font-size: 10px; text-align: center;">BOITE</div>
-          Arrondi / Ep: <div style="display:flex;gap:2px;"><input type="number" placeholder="Radius" .value="${c[p+'_br']||12}" @input="${e=>this._up(p+'_br',e.target.value)}"><input type="number" placeholder="Ep.Bordure" .value="${c[p+'_b_w']||2}" @input="${e=>this._up(p+'_b_w',e.target.value)}"></div>
-          W / H Boite: <div style="display:flex;gap:2px;"><input type="number" .value="${c[p+'_w_box']||120}" @input="${e=>this._up(p+'_w_box',e.target.value)}"><input type="number" .value="${c[p+'_h_box']||''}" @input="${e=>this._up(p+'_h_box',e.target.value)}"></div>
-          Fond / Néon: <div style="display:flex;gap:2px;"><input type="text" placeholder="Fond" .value="${c[p+'_bg']||''}" @input="${e=>this._up(p+'_bg',e.target.value)}"><input type="text" placeholder="Néon" .value="${c[p+'_bc']||''}" @input="${e=>this._up(p+'_bc',e.target.value)}"></div>
+          <div style="grid-column: span 2; background: #333; padding: 4px; border-radius: 4px; font-size: 10px; text-align: center;">TEXTES (Couleur / Taille)</div>
+          Nom: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_tc']||'#aaa'}" @input="${e=>this._up(p+'_tc',e.target.value)}"><input type="number" .value="${c[p+'_fs_l']||10}" @input="${e=>this._up(p+'_fs_l',e.target.value)}"></div>
+          Val 1: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_vc']||'#fff'}" @input="${e=>this._up(p+'_vc',e.target.value)}"><input type="number" .value="${c[p+'_fs_v']||15}" @input="${e=>this._up(p+'_fs_v',e.target.value)}"></div>
+          Val 2: <div style="display:flex;gap:2px;"><input type="text" .value="${c[p+'_v2c']||'#4caf50'}" @input="${e=>this._up(p+'_v2c',e.target.value)}"><input type="number" .value="${c[p+'_fs_v2']||12}" @input="${e=>this._up(p+'_fs_v2',e.target.value)}"></div>
           
           <div style="grid-column: span 2; border-top: 1px solid #444; margin: 5px 0;"></div>
           Entité 1/2: <div style="display:flex;gap:2px;"><input list="e" .value="${c[p+'_ent']||''}" @input="${e=>this._up(p+'_ent',e.target.value)}"><input list="e" .value="${c[p+'_ent2']||''}" @input="${e=>this._up(p+'_ent2',e.target.value)}"></div>
@@ -192,5 +214,5 @@
   customElements.define("solaire-card-editor", SolaireCardEditor);
   customElements.define("solaire-card", SolaireCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "solaire-card", name: "Solaire V220 Designer" });
+  window.customCards.push({ type: "solaire-card", name: "Solaire V230 Smart Effects" });
 })();
